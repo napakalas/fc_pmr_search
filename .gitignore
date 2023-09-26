@@ -160,3 +160,13 @@ cython_debug/
 #.idea/
 
 .DS_Store
+
+
+pmrsearch/output/*
+!pmrsearch/output/.keep
+
+pmrsearch/resources/*
+!pmrsearch/resources/.keep
+
+pmrsearch/indexes/*
+!pmrsearch/indexes/.keep
