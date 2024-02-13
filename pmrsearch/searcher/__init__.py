@@ -11,7 +11,7 @@ import logging
 
 #===============================================================================
 
-from ..setup import SEARCH_FILE, SCKAN_FILE, PMR_URL, BIOBERT, NLPModel, SCKAN2PMR, METADATA, METADATA_FILE, SCKAN2PMR_SQLITE
+from ..setup import SEARCH_FILE, SCKAN_FILE, PMR_URL, BIOBERT, NLPModel, SCKAN2PMR, METADATA, METADATA_FILE, SCKAN2PMR_SQLITE, MISSED_TERM
 
 TOP_K = 1000
 MIN_SIM = 0.6
@@ -200,6 +200,24 @@ class PMRSearcher:
                     term2pmr[sckan_id] = found_models
         return term2pmr
 
+    def check_and_generate_annotation_completeness(self, annotation_file):
+        missed = {}
+        included = ['FTU Name', 'Organ', 'Model', 'Label', 'Nerve Name', 'Organ/System', 'Models', 'Organ Name', 'Systems', 'System Name', 'Vessel Name']
+        if annotation_file is None:
+            pass
+        elif os.path.exists(annotation_file):
+            with open(annotation_file, 'r') as f:
+                annotations = json.load(f)
+            for level, values in annotations.items():
+                missed[level] = []
+                for value in values:
+                    new_value = {k:v for k, v in value.items() if k in included}
+                    term_id = value.get('Model', value.get('Models', ''))
+                    if term_id not in self.__sckan_term:
+                        missed[level] += [new_value]
+
+        with open(MISSED_TERM, 'w') as f:
+            json.dump(missed, f, indent=4)
 
     def generate_term_to_pmr_save(self, min_sim=MIN_SIM):
         term2pmr = self.generate_term_to_pmr(min_sim=min_sim)
@@ -216,11 +234,12 @@ class PMRSearcher:
         with open(METADATA_FILE, 'w') as f:
             json.dump(METADATA, f)
 
-        # save to sqllite
+        # save to sqlite
         if os.path.exists(SCKAN2PMR_SQLITE):
             os.remove(SCKAN2PMR_SQLITE)
         conn = sqlite3.connect(SCKAN2PMR_SQLITE)
         cursor = conn.cursor()
+        # create table
         SQL_SCKAN2PMR = """
             CREATE TABLE SCKAN2PMR
             (
@@ -242,6 +261,7 @@ class PMRSearcher:
             );
         """
         cursor.execute(SQL_METADATA)
+        # store term2pmr
         for sckan_id, pmr_models in tqdm(term2pmr.items()):
             data = []
             for pmr in pmr_models:
@@ -250,11 +270,14 @@ class PMRSearcher:
                 "INSERT INTO SCKAN2PMR values (?, ?, ?, ?, ?)", data
             )
             conn.commit()
+        # store metadata
         cursor.execute(
             "INSERT INTO METADATA values (?, ?, ?, ?)",
             (METADATA['sckan_url'], METADATA['sckan_build'], METADATA['pmrindexer_version'], METADATA['minimum_similarity'])
         )
         conn.commit()
+        # create index
+        cursor.execute("CREATE INDEX index_sckan2pmr_sckan_id ON sckan2pmr (sckan_id);")
         conn.close()
 
 #===============================================================================

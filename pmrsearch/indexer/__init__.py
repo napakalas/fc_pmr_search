@@ -191,7 +191,7 @@ class PMRIndexer:
                     
                     paragraphs = soup.find_all('p') + soup.find_all('para')
                     for p in paragraphs:
-                        if p is None:
+                        if p is not None:
                             try:
                                 p = re.sub('\s+', ' ', p.text).strip()
                                 p = re.sub(pattern, r'(\1)', p)
@@ -310,7 +310,8 @@ class PMRIndexer:
 
         combined_data = {
             'term':term_embeddings['id'], 
-            'embedding':term_embeddings['embs'], 'pmrTerm':pmr_terms, 
+            'embedding':term_embeddings['embs'], 
+            'pmrTerm':pmr_terms, 
             'sckanTerm':self.__sckan_terms, 
             'cellml':self.__cellmls, 
             'cluster':cluster, 

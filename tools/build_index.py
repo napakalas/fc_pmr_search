@@ -8,7 +8,8 @@ def main():
     parser.add_argument('--workspace', dest='workspaceDir', help='Path to PMR workspaces')
     args = parser.parse_args()
 
-    pmr_indexer = PMRIndexer(args.workspaceDir)
+    pmr_indexer = PMRIndexer(pmr_workspace_dir=args.workspaceDir)
+
     pmr_indexer.create_search_index()
     
     

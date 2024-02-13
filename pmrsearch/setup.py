@@ -15,6 +15,7 @@ SCKAN_TERMS = f'{RESOURCE_PATH}/sckan_terms.json'
 
 SCKAN2PMR =  f'{CURRENT_PATH}/output/sckan2pmr.json'
 SCKAN2PMR_SQLITE = f'{CURRENT_PATH}/output/sckan2pmr.db'
+MISSED_TERM = f'{CURRENT_PATH}/output/missed_term.json'
 
 PMR_URL = 'https://models.physiomeproject.org/'
 
@@ -34,9 +35,8 @@ def url_to_curie(url):
             try:
                 class_id = match.group(1) + ':' + match.group(2)
             except Exception:
-                return class_id
+                pass
+        return class_id
     elif url.startswith('urn:miriam'):
-        class_id = url.rsplit(':', 1)[-1].replace('%3A', ':')
-    else:
-        return url
-    return class_id
+        return url.rsplit(':', 1)[-1].replace('%3A', ':')
+    return url
