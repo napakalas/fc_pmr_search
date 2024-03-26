@@ -19,3 +19,5 @@ if __name__ == '__main__':
     main()
 
 #===============================================================================
+
+# poetry run python tools/build_index.py --workspace /Users/ymun794/Documents/Git_PhD/casbert-indexer/casbert_indexer/workspaces
