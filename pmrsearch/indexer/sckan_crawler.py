@@ -10,7 +10,7 @@ import json
 from rdflib.namespace import OWL, RDFS
 import torch
 
-from ..setup import SCKAN_GRAPH, METADATA, METADATA_FILE, url_to_curie, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_FILE
+from ..setup import SCKAN_GRAPH, METADATA, METADATA_FILE, url_to_curie, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_BIOBERT_FILE
 
 def __get_ttl(path):
     """
@@ -82,7 +82,7 @@ def __download_sckan(url):
         os.remove(temp_zip_file_path)
         os.rmdir(temp_dir)    
 
-def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp_model, url=None, store_as=None):
+def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp_model, url=None, store_as=None, device='cpu', clean_extraction=True):
     """
     url: a URL †o SCKAN release zip, e.g. https://github.com/SciCrunch/NIF-Ontology/releases/download/sckan-2023-08-04/release-2023-08-04T005709Z-sckan.zip
     ontologies: graph of ontology collections
@@ -93,16 +93,20 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
     """
 
     store_as = SCKAN_GRAPH if store_as is None else store_as
-    try:
-        if (METADATA.get('sckan_url', '') == url or url is None) and os.path.exists(store_as):
-            with open(SCKAN_TERMS, 'r') as f:
-                sckan_terms = json.load(f)
-            sckan_bert_embs = torch.load(SCKAN_BERT_FILE)
-            sckan_biobert_embs = torch.load(SCKAN_FILE)
-            return sckan_terms, sckan_bert_embs, sckan_biobert_embs
-    except Exception:
-        logging.warning('Cannot loaded the identified graph file. Continue to loading the provided URL')
-
+    if not clean_extraction:
+        try:
+            if (METADATA.get('sckan_url', '') == url or url is None) and os.path.exists(store_as):
+                with open(SCKAN_TERMS, 'r') as f:
+                    sckan_terms = json.load(f)
+                map_location = torch.device(device)
+                sckan_bert_embs = torch.load(SCKAN_BERT_FILE, map_location=map_location)
+                sckan_biobert_embs = torch.load(SCKAN_BIOBERT_FILE, map_location=map_location)
+                print('123')
+                return sckan_terms, sckan_bert_embs, sckan_biobert_embs
+        except Exception:
+            logging.warning('Cannot loaded the identified graph file. Continue to loading the provided URL')
+        return
+    
     if url is not None:
         # download file
         sckan_path = __download_sckan(url)
@@ -175,6 +179,6 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
     with open(SCKAN_TERMS, 'w') as f:
         json.dump(sckan_terms, f)
     torch.save(sckan_bert_embs, SCKAN_BERT_FILE)
-    torch.save(sckan_biobert_embs, SCKAN_FILE)
+    torch.save(sckan_biobert_embs, SCKAN_BIOBERT_FILE)
 
     return sckan_terms, sckan_bert_embs, sckan_biobert_embs

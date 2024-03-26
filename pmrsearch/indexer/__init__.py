@@ -12,11 +12,10 @@ import codecs
 import spacy
 from scispacy.linking import EntityLinker
 from scispacy.abbreviation import AbbreviationDetector
-from rdflib.namespace import OWL, RDFS
 import logging
-import rdflib
 
-from ..setup import RESOURCE_PATH, SCKAN_FILE, SEARCH_FILE, BERTModel, BIOBERT, NLPModel, METADATA, METADATA_FILE, SCKAN_BERT_FILE, SCKAN_TERMS, url_to_curie
+from ..setup import RESOURCE_PATH, SEARCH_FILE, BERTModel, BIOBERT, NLPModel, METADATA, \
+    METADATA_FILE, url_to_curie
 from .sckan_crawler import extract_sckan_terms
 
 ONTO_DF = f'{RESOURCE_PATH}/ontoDf.gz'
@@ -30,6 +29,9 @@ RS_CELLML_DATA = f'{RESOURCE_PATH}/cellml_data.json'
 
 ALPHA = 0.5
 BETA = 0.5
+NLP_THRESHOLD = 0.9
+SEARCH_THRESHOLD = 0.8
+SEARCH_BIO_THRESHOLD = 0.8
 
 def to_embedding(term_data, model, nlp_model):
     # get embedding of the main label
@@ -62,11 +64,11 @@ def to_embedding(term_data, model, nlp_model):
     return embs
 
 class PMRIndexer:
-    def __init__(self, pmr_workspace_dir, bert_model=None, biobert_model=None, nlp_model=None, sckan_url=None, pmr_onto=ONTO_DF):
-        self.__bert_model = SentenceTransformer(BERTModel) if bert_model is None else bert_model 
-        self.__biobert_model = SentenceTransformer(BIOBERT) if biobert_model is None else biobert_model
+    def __init__(self, pmr_workspace_dir, bert_model=None, biobert_model=None, nlp_model=None, sckan_url=None, pmr_onto=ONTO_DF, device='cpu'):
+        self.__bert_model = SentenceTransformer(BERTModel, device=device) if bert_model is None else bert_model
+        self.__biobert_model = SentenceTransformer(BIOBERT, device=device) if biobert_model is None else biobert_model
         self.__nlp_model = spacy.load(NLPModel) if nlp_model is None else nlp_model
-        self.__nlp_model.add_pipe("scispacy_linker", config={"resolve_abbreviations": True, "linker_name": "umls", "threshold": 0.9,})
+        self.__nlp_model.add_pipe("scispacy_linker", config={"resolve_abbreviations": True, "linker_name": "umls", "threshold": NLP_THRESHOLD})
         self.__linker = self.__nlp_model.get_pipe("scispacy_linker")
         self.__nlp_model.add_pipe("abbreviation_detector")
         self.__pmr_workspace_dir = pmr_workspace_dir
@@ -91,8 +93,8 @@ class PMRIndexer:
         return results
 
     def __get_sckan_candidate(self, query):
-            r1 = self.__sckan_search(query, self.__bert_model, self.__sckan_bert_embs, k=10, th=0.6)
-            r2 = self.__sckan_search(query, self.__biobert_model, self.__sckan_biobert_embs, k=10, th=0.9)
+            r1 = self.__sckan_search(query, self.__bert_model, self.__sckan_bert_embs, k=10, th=SEARCH_THRESHOLD)
+            r2 = self.__sckan_search(query, self.__biobert_model, self.__sckan_biobert_embs, k=10, th=SEARCH_BIO_THRESHOLD)
             for r2_ids in r2:
                 if r2_ids in r1:
                     return (r2_ids, r2[r2_ids][0], (r2[r2_ids][1]+r1[r2_ids][1])/2)
@@ -273,7 +275,7 @@ class PMRIndexer:
         
         return terms, term_to_cellml, id_to_cellml, term_embeddings, cellml_embeddings
 
-    def create_search_index(self):
+    def create_search_index(self, clean_extraction=True):
         self.__sckan_terms, self.__sckan_bert_embs, self.__sckan_biobert_embs = extract_sckan_terms(
             ontologies=self.__ontologies,
             to_embedding=to_embedding, 
@@ -281,8 +283,10 @@ class PMRIndexer:
             biobert_model=self.__biobert_model,
             nlp_model=self.__nlp_model,
             url=self.__sckan_url, 
+            clean_extraction=clean_extraction,
             )
         
+        print(self.__sckan_bert_embs['embs'].shape, self.__sckan_biobert_embs['embs'].shape)
         with open(RS_CELLML, 'r') as fp:
             self.__cellmls = json.load(fp)
 

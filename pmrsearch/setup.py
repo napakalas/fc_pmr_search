@@ -8,20 +8,20 @@ RESOURCE_PATH = f'{CURRENT_PATH}/resources'
 
 SEARCH_FILE = f'{CURRENT_PATH}/indexes/search_data.pt'
 SCKAN_BERT_FILE = f'{CURRENT_PATH}/indexes/sckan_bert.pt'
-SCKAN_FILE = f'{CURRENT_PATH}/indexes/sckan.pt'
+SCKAN_BIOBERT_FILE = f'{CURRENT_PATH}/indexes/sckan_biobert.pt'
 
 SCKAN_GRAPH = f'{RESOURCE_PATH}/sckan.graph' 
 SCKAN_TERMS = f'{RESOURCE_PATH}/sckan_terms.json'
 
 SCKAN2PMR =  f'{CURRENT_PATH}/output/sckan2pmr.json'
 SCKAN2PMR_SQLITE = f'{CURRENT_PATH}/output/sckan2pmr.db'
-MISSED_TERM = f'{CURRENT_PATH}/output/missed_term.json'
+ANATOMICAL_TERMS = f'{CURRENT_PATH}/output/anatomical_terms.json'
 
 PMR_URL = 'https://models.physiomeproject.org/'
 
-BERTModel = 'multi-qa-MiniLM-L6-cos-v1'
-BIOBERT = 'gsarti/biobert-nli'
-NLPModel = 'en_core_sci_scibert'
+BERTModel = 'multi-qa-mpnet-base-dot-v1'
+BIOBERT = 'FremyCompany/BioLORD-2023' # this model accommodate semantic textual similarity
+NLPModel = 'en_core_sci_lg'
 
 METADATA_FILE = f'{CURRENT_PATH}/output/metadata.json'
 with open(METADATA_FILE, 'r') as f:
