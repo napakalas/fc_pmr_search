@@ -11,7 +11,7 @@ import logging
 
 #===============================================================================
 
-from ..setup import SEARCH_FILE, SCKAN_FILE, PMR_URL, BIOBERT, NLPModel, SCKAN2PMR, METADATA, METADATA_FILE, SCKAN2PMR_SQLITE, MISSED_TERM
+from ..setup import SEARCH_FILE, SCKAN_BIOBERT_FILE, PMR_URL, BIOBERT, NLPModel, SCKAN2PMR, METADATA, METADATA_FILE, SCKAN2PMR_SQLITE, ANATOMICAL_TERMS
 
 TOP_K = 1000
 MIN_SIM = 0.6
@@ -20,8 +20,9 @@ C_WEIGHT = 0.8
 #===============================================================================
 
 class PMRSearcher:
-    def __init__(self, emb_model=None, nlp_model=None):
-        data = torch.load(SEARCH_FILE)
+    def __init__(self, emb_model=None, nlp_model=None, device='cpu'):
+        map_location = torch.device(device)
+        data = torch.load(SEARCH_FILE, map_location=map_location)
         self.__term_embs = data['embedding']
         self.__terms = data['term']
         self.__pmr_term = data['pmrTerm']
@@ -32,11 +33,11 @@ class PMRSearcher:
         self.__cellml_ids = data['cellmlId']
         self.__cellml_embs = data['cellmlEmbs']
 
-        self.__model = SentenceTransformer(BIOBERT) if emb_model is None else emb_model
+        self.__model = SentenceTransformer(BIOBERT, device=device) if emb_model is None else emb_model
         self.__nlp = spacy.load(NLPModel) if nlp_model is None else nlp_model
 
         
-        data = torch.load(SCKAN_FILE)
+        data = torch.load(SCKAN_BIOBERT_FILE, map_location=map_location)
         self.__sckan_ids = data['id']
         self.__sckan_embs = data['embs']
         
@@ -182,7 +183,7 @@ class PMRSearcher:
     
     def generate_term_to_pmr(self, min_sim=MIN_SIM):
         term2pmr = {}
-        logging.info('Generating mapp of SCKAN terms to PMR models')
+        logging.info('Generating map of SCKAN terms to PMR models')
         for sckan_id in tqdm(self.__sckan_term.keys()):
             if len(pmr_models := self.search_cellml(sckan_id, min_sim=min_sim)) > 0:
                 found_models = []
@@ -202,6 +203,7 @@ class PMRSearcher:
 
     def check_and_generate_annotation_completeness(self, annotation_file):
         missed = {}
+        found = {}
         included = ['FTU Name', 'Organ', 'Model', 'Label', 'Nerve Name', 'Organ/System', 'Models', 'Organ Name', 'Systems', 'System Name', 'Vessel Name']
         if annotation_file is None:
             pass
@@ -209,19 +211,19 @@ class PMRSearcher:
             with open(annotation_file, 'r') as f:
                 annotations = json.load(f)
             for level, values in annotations.items():
-                missed[level] = []
                 for value in values:
                     new_value = {k:v for k, v in value.items() if k in included}
                     term_id = value.get('Model', value.get('Models', ''))
                     if term_id not in self.__sckan_term:
-                        missed[level] += [new_value]
+                        missed[term_id] += [new_value]
+                    else:
+                        found[level] += [new_value]
 
-        with open(MISSED_TERM, 'w') as f:
-            json.dump(missed, f, indent=4)
+        with open(ANATOMICAL_TERMS, 'w') as f:
+            json.dump({'found':found, 'missed':missed}, f, indent=4)
 
     def generate_term_to_pmr_save(self, min_sim=MIN_SIM):
         term2pmr = self.generate_term_to_pmr(min_sim=min_sim)
-
         # save to json file
         with open(SCKAN2PMR, 'w') as f:
             json.dump(term2pmr, f, indent=4)
@@ -231,6 +233,8 @@ class PMRSearcher:
 
         # update METADATA
         METADATA['minimum_similarity'] = min_sim
+        from .. import __version__
+        METADATA['pmrindexer_version'] = __version__
         with open(METADATA_FILE, 'w') as f:
             json.dump(METADATA, f)
 
