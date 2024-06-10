@@ -10,6 +10,7 @@ import json
 from rdflib.namespace import OWL, RDFS
 import torch
 import logging  as log
+import shutil
 
 from ..setup import SCKAN_GRAPH, METADATA, METADATA_FILE, url_to_curie, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_BIOBERT_FILE, request_json
 
@@ -87,10 +88,6 @@ def __download_sckan(url):
             logging.error(f"Failed to download ZIP file. Status code: {response.status_code}")
     except Exception as e:
         logging.error(f"An error occurred: {e}")
-
-def __delete_tmp_files(temp_dir):
-    # Clean up: Delete the temporary ZIP file and its parent directory
-    os.rmdir(temp_dir)
 
 def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp_model, sckan_version=None, store_as=None, device='cpu', clean_extraction=True):
     """
@@ -190,7 +187,10 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
     torch.save(sckan_bert_embs, SCKAN_BERT_FILE)
     torch.save(sckan_biobert_embs, SCKAN_BIOBERT_FILE)
 
-    __delete_tmp_files(sckan_url)
+    # Clean up: Delete the temporary ZIP file and its parent directory
+    if sckan_url is not None:
+        shutil.rmtree(sckan_url, ignore_errors=True)
+
     return sckan_terms, sckan_bert_embs, sckan_biobert_embs
 
 def check_npo_release(npo_release) -> dict:
