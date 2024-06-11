@@ -73,7 +73,7 @@ class PMRSearcher:
         cellmls = self.__term_cellmls[term]
         workspaces, exposures = [], []
         for cellml_id in cellmls:
-            cellml = self.__cellmls['data'][cellml_id]
+            cellml = self.__cellmls[cellml_id]
             if cellml['workspace'] not in workspaces:
                 workspaces += [cellml['workspace']]
             if 'exposure' in cellml:
@@ -97,10 +97,10 @@ class PMRSearcher:
         # get exposure and workspace
         exposures, workspaces = [], []
         for cellml_id in available_cellml:
-            cellml = self.__cellmls['data'][cellml_id]
+            cellml = self.__cellmls[cellml_id]
             if 'workspace' in cellml:
                 workspaces += [cellml['workspace']] if cellml['workspace'] not in workspaces else []
-            if 'exposure' in self.__cellmls['data'][cellml_id]:
+            if 'exposure' in self.__cellmls[cellml_id]:
                 exposures += [cellml['exposure']] if cellml['exposure'] not in exposures else []
         return {'exposure':exposures, 'workspace':workspaces, 'cellml':available_cellml}
     
@@ -155,15 +155,15 @@ class PMRSearcher:
     
     def search_by_cellml(self, query, context=None, topk=TOP_K, min_sim=MIN_SIM, c_weight=C_WEIGHT):
         def get_exposure(cellml_id):
-            if 'exposure' in self.__cellmls['data'][cellml_id]:
-                return self.__cellmls['data'][cellml_id]['exposure']
+            if 'exposure' in self.__cellmls[cellml_id]:
+                return self.__cellmls[cellml_id]['exposure']
             else:
                 cluster_id = self.__cluster['url2Cluster'][cellml_id]
                 if cluster_id != '-1':
                     similar_cellmls = self.__cluster['cluster'][cluster_id]
                     for sim_cellml_id in similar_cellmls:
-                        if 'exposure' in self.__cellmls['data'][sim_cellml_id]:
-                            return self.__cellmls['data'][sim_cellml_id]['exposure']
+                        if 'exposure' in self.__cellmls[sim_cellml_id]:
+                            return self.__cellmls[sim_cellml_id]['exposure']
             return ''
 
         top_results = self.__search_terms(query, self.__cellml_embs, context, c_weight)
@@ -174,29 +174,37 @@ class PMRSearcher:
             cellml_id = self.__cellml_ids[idx]
             if cellml_id not in selected_cellmls:
                 selected_cellmls += [cellml_id]
-                cellml = self.__cellmls['data'][cellml_id]
+                cellml = self.__cellmls[cellml_id]
                 cellml_res += [{'score':score.item(), 
                                 'cellml':[cellml_id], 
                                 'workspace':[cellml['workspace']], 
                                 'exposure':[get_exposure(cellml_id)]}]
         return cellml_res
     
-    def generate_term_to_pmr(self, min_sim=MIN_SIM):
+    def generate_term_to_pmr(self, min_sim=MIN_SIM, exposure_only=True):
         term2pmr = {}
         logging.info('Generating map of SCKAN terms to PMR models')
         for sckan_id in tqdm(self.__sckan_term.keys()):
             if len(pmr_models := self.search_cellml(sckan_id, min_sim=min_sim)) > 0:
                 found_models = []
                 for pmr_model in pmr_models:
-                    cellml = self.__cellmls['data'][pmr_model[1]]
-                    sha = cellml['sha']
-                    cellml_link = PMR_URL + pmr_model[1].replace('HEAD', sha)
-                    new_model = {'cellml': cellml_link}
-                    new_model['workspace'] = PMR_URL + cellml['workspace']
-                    if 'exposure' in cellml:
-                        new_model['exposure'] = PMR_URL + cellml['exposure']
-                    new_model['score'] = pmr_model[0]
-                    found_models += [new_model]
+                    cellml = self.__cellmls[pmr_model[1]]
+                    if exposure_only and 'exposure' in cellml:
+                        sha = cellml['sha']
+                        cellml_link = PMR_URL + pmr_model[1].replace('HEAD', sha)
+                        new_model = {'cellml': cellml_link}
+                        new_model['workspace'] = PMR_URL + cellml['workspace']
+                        new_model['score'] = pmr_model[0]
+                        found_models += [new_model]
+                    else:
+                        sha = cellml['sha']
+                        cellml_link = PMR_URL + pmr_model[1].replace('HEAD', sha)
+                        new_model = {'cellml': cellml_link}
+                        new_model['workspace'] = PMR_URL + cellml['workspace']
+                        if 'exposure' in cellml:
+                            new_model['exposure'] = PMR_URL + cellml['exposure']
+                        new_model['score'] = pmr_model[0]
+                        found_models += [new_model]
                 if len(found_models) > 0:
                     term2pmr[sckan_id] = found_models
         return term2pmr
@@ -222,14 +230,11 @@ class PMRSearcher:
         with open(ANATOMICAL_TERMS, 'w') as f:
             json.dump({'found':found, 'missed':missed}, f, indent=4)
 
-    def generate_term_to_pmr_save(self, min_sim=MIN_SIM):
-        term2pmr = self.generate_term_to_pmr(min_sim=min_sim)
+    def generate_term_to_pmr_save(self, min_sim=MIN_SIM, exposure_only=True):
+        term2pmr = self.generate_term_to_pmr(min_sim=min_sim, exposure_only=exposure_only)
         # save to json file
         with open(SCKAN2PMR, 'w') as f:
             json.dump(term2pmr, f, indent=4)
-
-        # with open(SCKAN2PMR, 'r') as f:
-        #     term2pmr = json.load(f)
 
         # update METADATA
         METADATA['minimum_similarity'] = min_sim
@@ -238,6 +243,7 @@ class PMRSearcher:
         with open(METADATA_FILE, 'w') as f:
             json.dump(METADATA, f)
 
+        return
         # save to sqlite
         if os.path.exists(SCKAN2PMR_SQLITE):
             os.remove(SCKAN2PMR_SQLITE)
