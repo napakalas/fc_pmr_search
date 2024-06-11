@@ -1,4 +1,5 @@
 from pmrsearch import Workspaces
+from pmrsearch.indexer import RS_WORKSPACE
 
-workspaces = Workspaces('/Users/ymun794/Documents/MapCore/fc-pmr-search/pmrsearch/resources/listOfWorkspace.json')
+workspaces = Workspaces(RS_WORKSPACE)
 workspaces.update()
