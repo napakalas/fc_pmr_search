@@ -1,11 +1,15 @@
 [tool.poetry]
 name = "pmrsearch"
 version = "0.0.2"
-description = "Find all models in the PMR based on model terms in FC"
+description = "Find all models in the PMR based on model terms in FC and SCKAN"
 authors = ["Yuda Munarko <yuda.munarko@auckland.ac.nz>"]
 include = [
     "pmrsearch/searcher/indexes/sckan.pt",
-    "pmrsearch/searcher/indexes/search_data.pt"
+    "pmrsearch/searcher/indexes/search_data.pt",
+    "pmrsearch/workspaces/.keep"
+]
+exclude = [
+    "pmrsearch/workspaces/*"
 ]
 
 [tool.poetry.dependencies]
