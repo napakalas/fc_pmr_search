@@ -2,6 +2,8 @@
 
 import torch
 from sentence_transformers import SentenceTransformer, util
+import torch.backends
+import torch.backends.mps
 from tqdm import tqdm
 import spacy
 import json
@@ -20,7 +22,13 @@ C_WEIGHT = 0.8
 #===============================================================================
 
 class PMRSearcher:
-    def __init__(self, emb_model=None, nlp_model=None, device='cpu'):
+    def __init__(self, emb_model=None, nlp_model=None):
+        if torch.cuda.is_available():
+            device = 'gpu'
+        elif torch.backends.mps.is_available():
+            device = 'mps'
+        else:
+            device = 'cpu'
         map_location = torch.device(device)
         data = torch.load(SEARCH_FILE, map_location=map_location)
         self.__term_embs = data['embedding']
@@ -188,23 +196,21 @@ class PMRSearcher:
             if len(pmr_models := self.search_cellml(sckan_id, min_sim=min_sim)) > 0:
                 found_models = []
                 for pmr_model in pmr_models:
-                    cellml = self.__cellmls[pmr_model[1]]
-                    if exposure_only and 'exposure' in cellml:
-                        sha = cellml['sha']
-                        cellml_link = PMR_URL + pmr_model[1].replace('HEAD', sha)
-                        new_model = {'cellml': cellml_link}
-                        new_model['workspace'] = PMR_URL + cellml['workspace']
-                        new_model['score'] = pmr_model[0]
-                        found_models += [new_model]
-                    else:
-                        sha = cellml['sha']
-                        cellml_link = PMR_URL + pmr_model[1].replace('HEAD', sha)
-                        new_model = {'cellml': cellml_link}
-                        new_model['workspace'] = PMR_URL + cellml['workspace']
-                        if 'exposure' in cellml:
-                            new_model['exposure'] = PMR_URL + cellml['exposure']
-                        new_model['score'] = pmr_model[0]
-                        found_models += [new_model]
+                    if pmr_model[1] not in found_models:
+                        cellml = self.__cellmls[pmr_model[1]]
+                        workspace_dir = pmr_model[1][:pmr_model[1].index('rawfile')]
+                        new_model = {
+                            'cellml': pmr_model[1],
+                            'workspace': workspace_dir,
+                            'score': pmr_model[0]
+                            }
+                        if exposure_only and 'exposure' in cellml:
+                            new_model['exposure'] = cellml['exposure']
+                            found_models += [new_model]
+                        elif not exposure_only:
+                            if 'exposure' in cellml:
+                                new_model['exposure'] = cellml['exposure']
+                            found_models += [new_model]
                 if len(found_models) > 0:
                     term2pmr[sckan_id] = found_models
         return term2pmr

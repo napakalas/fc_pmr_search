@@ -89,7 +89,7 @@ def __download_sckan(url):
     except Exception as e:
         logging.error(f"An error occurred: {e}")
 
-def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp_model, sckan_version=None, store_as=None, device='cpu', clean_extraction=True):
+def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp_model, sckan_version=None, store_as=None, clean_extraction=True):
     """
     ontologies: graph of ontology collections
     to_embedding: a function to calculate embedding from query
@@ -101,6 +101,13 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
     device: adjust based on machine availability, cpu or gpu
     clean_extraction: when True, this will reextract sckan
     """
+
+    if torch.cuda.is_available():
+        device = 'gpu'
+    elif torch.backends.mps.is_available():
+        device = 'mps'
+    else:
+        device = 'cpu'
 
     if (npo_release:=check_npo_release(sckan_version)) is not None:
         if sckan_version is None:
