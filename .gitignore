@@ -168,5 +168,9 @@ pmrsearch/output/*
 pmrsearch/resources/*
 !pmrsearch/resources/.keep
 
+pmrsearch/workspaces/*
+!pmrsearch/workspaces/.keep
+
+
 # pmrsearch/indexes/*
 # !pmrsearch/indexes/.keep
