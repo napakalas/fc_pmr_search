@@ -1,8 +1,9 @@
 from pmrsearch.setup import SCKAN2PMR, CURRENT_PATH
+from pmrsearch import __version__
 import json
 import os
 
-EVALUATION_FILE = f'{CURRENT_PATH}/output/evaluation_results.json'
+EVALUATION_FILE = f'{CURRENT_PATH}/output/evaluation_results-{__version__}.json'
 
 def main():
     import argparse
@@ -10,9 +11,6 @@ def main():
     parser = argparse.ArgumentParser(description="Creating search index for SCKAN and PMR")
     parser.add_argument('--annotation', dest='annotations', help='Path FC annotation json file', default=None)
     args = parser.parse_args()
-
-    # data = torch.load(SEARCH_FILE, map_location=torch.device('cpu'))
-    # sckan_term = data['sckanTerm']
 
     with open(SCKAN2PMR, 'r') as f:
         sckan2pmr = json.load(f)
@@ -48,5 +46,5 @@ if __name__ == '__main__':
 #===============================================================================
 
 # Running script:
-# python create_sckan2pmr.py --annotation 'Path FC annotation json file'
+# python evaluate.py --annotation 'Path FC annotation json file'
     

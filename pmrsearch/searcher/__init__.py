@@ -13,7 +13,7 @@ import logging
 
 #===============================================================================
 
-from ..setup import SEARCH_FILE, SCKAN_BIOBERT_FILE, PMR_URL, BIOBERT, NLPModel, SCKAN2PMR, METADATA, METADATA_FILE, SCKAN2PMR_SQLITE, ANATOMICAL_TERMS
+from ..setup import SEARCH_FILE, SCKAN_BIOBERT_FILE, CURRENT_PATH, BIOBERT, NLPModel, SCKAN2PMR, METADATA, METADATA_FILE, SCKAN2PMR_SQLITE
 
 TOP_K = 1000
 MIN_SIM = 0.6
@@ -23,12 +23,7 @@ C_WEIGHT = 0.8
 
 class PMRSearcher:
     def __init__(self, emb_model=None, nlp_model=None):
-        if torch.cuda.is_available():
-            device = 'gpu'
-        elif torch.backends.mps.is_available():
-            device = 'mps'
-        else:
-            device = 'cpu'
+        device = 'gpu' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
         map_location = torch.device(device)
         data = torch.load(SEARCH_FILE, map_location=map_location)
         self.__term_embs = data['embedding']
@@ -232,8 +227,9 @@ class PMRSearcher:
                         missed[term_id] += [new_value]
                     else:
                         found[level] += [new_value]
-
-        with open(ANATOMICAL_TERMS, 'w') as f:
+        from .. import __version__
+        anatomical_terms = f'{CURRENT_PATH}/output/anatomical_terms-{__version__}.json'
+        with open(anatomical_terms, 'w') as f:
             json.dump({'found':found, 'missed':missed}, f, indent=4)
 
     def generate_term_to_pmr_save(self, min_sim=MIN_SIM, exposure_only=True):
@@ -247,53 +243,8 @@ class PMRSearcher:
         from .. import __version__
         METADATA['pmrindexer_version'] = __version__
         with open(METADATA_FILE, 'w') as f:
-            json.dump(METADATA, f)
+            json.dump(METADATA, f, indent=4)
 
         return
-        # save to sqlite
-        if os.path.exists(SCKAN2PMR_SQLITE):
-            os.remove(SCKAN2PMR_SQLITE)
-        conn = sqlite3.connect(SCKAN2PMR_SQLITE)
-        cursor = conn.cursor()
-        # create table
-        SQL_SCKAN2PMR = """
-            CREATE TABLE SCKAN2PMR
-            (
-                SCKAN_ID    TEXT    NOT NULL,
-                CELLML      TEXT    NOT NULL,
-                WORKSPACE   TEXT    NOT NULL,
-                EXPOSURE    TEXT,
-                SCORE       REAL
-            );
-        """
-        cursor.execute(SQL_SCKAN2PMR)
-        SQL_METADATA = """
-            CREATE TABLE METADATA
-            (
-                SCKAN_URL           TEXT    NOT NULL,
-                SCKAN_BUILD         TEXT    NOT NULL,
-                PMRINDEXER_VERSION  TEXT    NOT NULL,
-                MINIMUM_SIMILARITY  TEXT    NOT NULL
-            );
-        """
-        cursor.execute(SQL_METADATA)
-        # store term2pmr
-        for sckan_id, pmr_models in tqdm(term2pmr.items()):
-            data = []
-            for pmr in pmr_models:
-                data += [(sckan_id, pmr['cellml'], pmr['workspace'], pmr.get('exposure'), pmr['score'])]
-            cursor.executemany(
-                "INSERT INTO SCKAN2PMR values (?, ?, ?, ?, ?)", data
-            )
-            conn.commit()
-        # store metadata
-        cursor.execute(
-            "INSERT INTO METADATA values (?, ?, ?, ?)",
-            (METADATA['sckan_url'], METADATA['sckan_build'], METADATA['pmrindexer_version'], METADATA['minimum_similarity'])
-        )
-        conn.commit()
-        # create index
-        cursor.execute("CREATE INDEX index_sckan2pmr_sckan_id ON sckan2pmr (sckan_id);")
-        conn.close()
 
 #===============================================================================

@@ -98,16 +98,10 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
     nlp_model: model to identify named entity, etc
     sckan_version: the version of sckan, located in https://github.com/SciCrunch/NIF-Ontology/releases, e.g. sckan-2024-03-26
     store_as: the crawled file is loaded into rdflib graph and then stored as a file using pickle
-    device: adjust based on machine availability, cpu or gpu
     clean_extraction: when True, this will reextract sckan
     """
 
-    if torch.cuda.is_available():
-        device = 'gpu'
-    elif torch.backends.mps.is_available():
-        device = 'mps'
-    else:
-        device = 'cpu'
+    device = 'gpu' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
 
     if (npo_release:=check_npo_release(sckan_version)) is not None:
         if sckan_version is None:

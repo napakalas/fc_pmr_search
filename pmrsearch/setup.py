@@ -21,7 +21,6 @@ SCKAN_TERMS = f'{RESOURCE_PATH}/sckan_terms.json'
 
 SCKAN2PMR =  f'{CURRENT_PATH}/output/sckan2pmr.json'
 SCKAN2PMR_SQLITE = f'{CURRENT_PATH}/output/sckan2pmr.db'
-ANATOMICAL_TERMS = f'{CURRENT_PATH}/output/anatomical_terms.json'
 
 PMR_URL = 'https://models.physiomeproject.org/'
 

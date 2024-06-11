@@ -5,7 +5,8 @@ from pprint import pprint
 import torch
 
 def main():
-    map_location = torch.device('mps')
+    device = 'gpu' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+    map_location = torch.device(device)
     data = torch.load(SEARCH_FILE, map_location=map_location)
 
     print('Create clusterer with XPath and structure features using HDBSCAN')
