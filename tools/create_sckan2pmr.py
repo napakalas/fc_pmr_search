@@ -6,10 +6,11 @@ def main():
 
     parser = argparse.ArgumentParser(description="Creating search index for SCKAN and PMR")
     parser.add_argument('--min-sim', dest='minimalSimilarity', help='Minimal similarity.', default=0.7)
+    parser.add_argument('--exposure-only', dest='exposureOnly', help='Returning cellml with exposure only', action='store_true')
     args = parser.parse_args()
 
     searcher = PMRSearcher()
-    searcher.generate_term_to_pmr_save(min_sim=args.min_sim)
+    searcher.generate_term_to_pmr_save(min_sim=args.minimalSimilarity, exposure_only=args.exposureOnly)
 
 #===============================================================================
 
@@ -19,5 +20,7 @@ if __name__ == '__main__':
 #===============================================================================
 
 # Running script:
-# python create_sckan2pmr.py --min-sim 'Minimal similarity'
-    
+# python create_sckan2pmr.py
+# python create_sckan2pmr.py --min-sim 0.7
+# python create_sckan2pmr.py --exposure-only
+# python create_sckan2pmr.py --exposure-only --min-sim 0.7
