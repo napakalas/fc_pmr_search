@@ -27,8 +27,8 @@ class CellmlClusterer:
        (the possible value: FEAT_DOCUMENTATION, FEAT_XPATH_DEEP, FEAT_XPATH_WIDE,
         FEAT_XPATH_STRUCT, FEAT_XPATH_DEEP_WIDE_STRUCT, FEAT_ALL)
     """
-    def __init__(self, workspace_dir, cellmls='', cellmlListFile='', featureType=FEAT_XPATH_DEEP_WIDE_STRUCT):
-        if cellmls == '':
+    def __init__(self, workspace_dir, cellmls=None, cellmlListFile='', featureType=FEAT_XPATH_DEEP_WIDE_STRUCT):
+        if cellmls is None:
             with open(cellmlListFile,'r') as f:
                 cellmls = json.load(f)
         self.__workspace_dir = workspace_dir
@@ -49,12 +49,9 @@ class CellmlClusterer:
     def __getCellmlsDocumentation(self, cellmls):
         documentations = {}
         parser = etree.XMLParser(recover=True, remove_comments=True)
-        for key, cellml in cellmls['data'].items():
-            if cellml['status'] != cellmls['status']['current']:
-                continue
+        for key, cellml in cellmls.items():
             if key not in documentations:
                 documentations[key] = ''
-                print('!!!', self.__workspace_dir,cellml['workingDir'],cellml['cellml'])
             path = os.path.join(self.__workspace_dir,cellml['workingDir'],cellml['cellml'])
             root = etree.parse(path, parser).getroot()
             tree = etree.ElementTree(root)
