@@ -9,8 +9,19 @@ import pickle
 import json
 from rdflib.namespace import OWL, RDFS
 import torch
+import logging  as log
+import shutil
 
-from ..setup import SCKAN_GRAPH, METADATA, METADATA_FILE, url_to_curie, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_FILE
+from ..setup import SCKAN_GRAPH, METADATA, METADATA_FILE, url_to_curie, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_BIOBERT_FILE, request_json
+
+NPO_OWNER = 'SciCrunch'
+NPO_REPO = 'NIF-Ontology'
+NPO_API = f'https://api.github.com/repos/{NPO_OWNER}/{NPO_REPO}'
+NPO_RAW = f'https://raw.githubusercontent.com/{NPO_OWNER}/{NPO_REPO}'
+NPO_GIT = f'https://github.com/{NPO_OWNER}/{NPO_REPO}'
+
+class NPOException(Exception):
+    pass
 
 def __get_ttl(path):
     """
@@ -54,14 +65,14 @@ def __load_sckan(sckan_path, dest_file):
 
 def __download_sckan(url):
     temp_dir = tempfile.mkdtemp()
+    # Create the full path for the temporary ZIP file
+    temp_zip_file_path = os.path.join(temp_dir, "release.zip")
     try:
         # Send an HTTP GET request to the GitHub raw file URL
         response = requests.get(url, timeout=10)
 
         # Check if the request was successful (status code 200)
         if response.status_code == 200:
-            # Create the full path for the temporary ZIP file
-            temp_zip_file_path = os.path.join(temp_dir, "release.zip")
 
             # Write the content of the response to the temporary ZIP file
             with open(temp_zip_file_path, 'wb') as temp_zip_file:
@@ -77,53 +88,59 @@ def __download_sckan(url):
             logging.error(f"Failed to download ZIP file. Status code: {response.status_code}")
     except Exception as e:
         logging.error(f"An error occurred: {e}")
-    finally:
-        # Clean up: Delete the temporary ZIP file and its parent directory
-        os.remove(temp_zip_file_path)
-        os.rmdir(temp_dir)    
 
-def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp_model, url=None, store_as=None):
+def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp_model, sckan_version=None, store_as=None, clean_extraction=True):
     """
-    url: a URL †o SCKAN release zip, e.g. https://github.com/SciCrunch/NIF-Ontology/releases/download/sckan-2023-08-04/release-2023-08-04T005709Z-sckan.zip
     ontologies: graph of ontology collections
-    embedding_function: a function to calculate embedding from query
+    to_embedding: a function to calculate embedding from query
     bert_model: bert model to convert terms to embedding
     biobert_model: biobert model to convert terms to embedding
+    nlp_model: model to identify named entity, etc
+    sckan_version: the version of sckan, located in https://github.com/SciCrunch/NIF-Ontology/releases, e.g. sckan-2024-03-26
     store_as: the crawled file is loaded into rdflib graph and then stored as a file using pickle
+    device: adjust based on machine availability, cpu or gpu
+    clean_extraction: when True, this will reextract sckan
     """
 
-    store_as = SCKAN_GRAPH if store_as is None else store_as
-    try:
-        if (METADATA.get('sckan_url', '') == url or url is None) and os.path.exists(store_as):
-            with open(SCKAN_TERMS, 'r') as f:
-                sckan_terms = json.load(f)
-            sckan_bert_embs = torch.load(SCKAN_BERT_FILE)
-            sckan_biobert_embs = torch.load(SCKAN_FILE)
-            return sckan_terms, sckan_bert_embs, sckan_biobert_embs
-    except Exception:
-        logging.warning('Cannot loaded the identified graph file. Continue to loading the provided URL')
+    if torch.cuda.is_available():
+        device = 'gpu'
+    elif torch.backends.mps.is_available():
+        device = 'mps'
+    else:
+        device = 'cpu'
 
-    if url is not None:
-        # download file
-        sckan_path = __download_sckan(url)
-        # load SCKAN
-        g = __load_sckan(sckan_path, store_as)
-
-        # update METADATA sckan_url
-        METADATA['sckan_url'] = url
-        # update METADATA sckan_build
-        sbj = rdflib.URIRef('http://uri.interlex.org/tgbugs/uris/readable/build/prov')
-        pred = rdflib.URIRef('http://uri.interlex.org/tgbugs/uris/readable/build/date')
-        for o in g.objects(sbj, pred):
-            sckan_build = str(print(o))
-        METADATA['sckan_build'] = sckan_build
-        # save metadata
-        with open(METADATA_FILE, 'w') as f:
-            json.dump(METADATA, f)
+    if (npo_release:=check_npo_release(sckan_version)) is not None:
+        if sckan_version is None:
+            sckan_version = npo_release['sckan_version']
     else:
         logging.error('Local SCKAN graph file is not available. URL should be provided')
         return None, None, None
 
+    store_as = SCKAN_GRAPH if store_as is None else store_as
+    if not clean_extraction and METADATA.get('sckan_version', '') == sckan_version:
+        try:
+            if (METADATA.get('sckan_version', '') == sckan_version or sckan_version is None) and os.path.exists(store_as):
+                with open(SCKAN_TERMS, 'r') as f:
+                    sckan_terms = json.load(f)
+                map_location = torch.device(device)
+                sckan_bert_embs = torch.load(SCKAN_BERT_FILE, map_location=map_location)
+                sckan_biobert_embs = torch.load(SCKAN_BIOBERT_FILE, map_location=map_location)
+                return sckan_terms, sckan_bert_embs, sckan_biobert_embs
+        except Exception:
+            logging.warning('Cannot load the identified graph file. Continue to loading the provided URL')
+            return
+
+    # download file
+    sckan_url = __download_sckan(npo_release['sckan_url'])
+    # load SCKAN
+    g = __load_sckan(sckan_url, store_as)
+    # update METADATA sckan_url
+    for k, v in npo_release.items():
+        METADATA[k] = v
+    # save metadata
+    with open(METADATA_FILE, 'w') as f:
+        json.dump(METADATA, f)
+    
     sckan_terms = {}
     for s, p, o in tqdm(g):
         if 'ilx_' in str(s) or 'UBERON' in str(s):
@@ -148,7 +165,7 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
                 if is_a is not None and is_a != OWL.Restriction and is_a not in sckan_terms[class_id]['is_a']:
                     sckan_terms[class_id]['is_a'] += [str(is_a)]
             # synonym
-            if 'synonym' in str(p.lower()):
+            if 'synonym' in str(p).lower():
                 sckan_terms[class_id]['synonym'] += [str(o)]
             # delete if empty
             if sckan_terms[class_id]['label'] == '':
@@ -175,6 +192,44 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
     with open(SCKAN_TERMS, 'w') as f:
         json.dump(sckan_terms, f)
     torch.save(sckan_bert_embs, SCKAN_BERT_FILE)
-    torch.save(sckan_biobert_embs, SCKAN_FILE)
+    torch.save(sckan_biobert_embs, SCKAN_BIOBERT_FILE)
+
+    # Clean up: Delete the temporary ZIP file and its parent directory
+    if sckan_url is not None:
+        shutil.rmtree(sckan_url, ignore_errors=True)
 
     return sckan_terms, sckan_bert_embs, sckan_biobert_embs
+
+def check_npo_release(npo_release) -> dict:
+    #=================================================
+        if (response:=request_json(f'{NPO_API}/releases')) is not None:
+            releases = {r['tag_name']:r for r in response if r['tag_name'].startswith('sckan-')}
+            if npo_release is None:
+                if len(releases):
+                    # Use most recent
+                    npo_release = sorted(releases.keys())[-1]
+                    log.warning(f'No NPO release given: used {npo_release}')
+                else:
+                    raise NPOException('No NPO releases available')
+            elif npo_release not in releases:
+                raise NPOException(f'Unknown NPO release: {npo_release}')
+
+            release = releases[npo_release]
+            response = request_json(f'{NPO_API}/git/refs/tags/{release["tag_name"]}')
+            browser_download_url = ''
+            for asset in release['assets']:
+                if 'release' in asset['browser_download_url'].split('/')[-1]:
+                    browser_download_url = asset['browser_download_url']
+                    break
+            npo_build = {
+                'sckan_sha': response['object']['sha'] if response is not None else None,
+                'sckan_build': release['created_at'].split('T')[0],
+                'sckan_version': release["tag_name"],
+                'sckan_path': f'{NPO_GIT}/tree/{release["tag_name"]}',
+                'sckan_url': browser_download_url
+            }
+            return npo_build
+        else:
+            raise NPOException(f'NPO at {NPO_API} is not available')
+
+#===============================================================================
