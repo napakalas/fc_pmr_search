@@ -6,6 +6,8 @@ import pandas as pd
 import re
 import rdflib
 import rdflib.graph
+import torch.backends
+import torch.backends.mps
 from tqdm import tqdm
 import torch
 from sentence_transformers import SentenceTransformer, util
@@ -15,24 +17,15 @@ import spacy
 from scispacy.linking import EntityLinker
 from scispacy.abbreviation import AbbreviationDetector
 import logging as log
-
-import xmltodict
 from lxml import etree
 import re
-import urllib.parse as urilib
 
-
-from ..setup import RESOURCE_PATH, SEARCH_FILE, BERTModel, BIOBERT, NLPModel, METADATA, METADATA_FILE, WORKSPACE_DIR, url_to_curie, loadJson, dumpJson, getAllFilesInDir
+from ..setup import RESOURCE_PATH, SEARCH_FILE, BERTModel, BIOBERT, NLPModel, METADATA, METADATA_FILE, WORKSPACE_DIR, url_to_curie, loadJson, getAllFilesInDir
 from .sckan_crawler import extract_sckan_terms
+from .clusterer import CellmlClusterer
 
 ONTO_DF = f'{RESOURCE_PATH}/ontoDf.gz'
-SCKAN_PICKLE = f'{RESOURCE_PATH}/sckan.graph'
-
-RS_VARIABLE = f'{RESOURCE_PATH}/listOfVariable.json'
-RS_CELLML = f'{RESOURCE_PATH}/listOfCellml.json'
 RS_WORKSPACE = f'{RESOURCE_PATH}/listOfWorkspace.json'
-RS_CLUSTER = f'{RESOURCE_PATH}/cellmlClusterer.json'
-RS_CELLML_DATA = f'{RESOURCE_PATH}/cellml_data.json'
 
 ALPHA = 0.5
 BETA = 0.5
@@ -71,7 +64,13 @@ def to_embedding(term_data, model, nlp_model):
     return embs
 
 class PMRIndexer:
-    def __init__(self, pmr_workspace_dir, bert_model=None, biobert_model=None, nlp_model=None, sckan_version=None, pmr_onto=ONTO_DF, device='cpu'):
+    def __init__(self, pmr_workspace_dir, bert_model=None, biobert_model=None, nlp_model=None, sckan_version=None, pmr_onto=ONTO_DF):
+        if torch.cuda.is_available():
+            device = 'gpu'
+        elif torch.backends.mps.is_available():
+            device = 'mps'
+        else:
+            device = 'cpu'
         log.info(f'loading {BERTModel}')
         self.__bert_model = SentenceTransformer(BERTModel, device=device) if bert_model is None else bert_model
         log.info(f'loading {BIOBERT}')
@@ -324,8 +323,7 @@ class PMRIndexer:
 
         pmr_terms, term_to_cellml , term_embeddings, cellml_embeddings = self.__extract_pmr()
 
-        with open(RS_CLUSTER, 'r') as f:
-            cluster = json.load(f)
+        pmr_clusterer = CellmlClusterer(workspace_dir=self.__pmr_workspace_dir, cellmls=self.__cellmls)
 
         combined_data = {
             'term':term_embeddings['id'], 
@@ -333,7 +331,7 @@ class PMRIndexer:
             'pmrTerm':pmr_terms, 
             'sckanTerm':self.__sckan_terms, 
             'cellml':self.__cellmls, 
-            'cluster':cluster, 
+            'cluster':pmr_clusterer.getDict(),
             'termCellml':term_to_cellml, 
             'cellmlId': cellml_embeddings['id'], 
             'cellmlEmbs':torch.stack(cellml_embeddings['embs'])
