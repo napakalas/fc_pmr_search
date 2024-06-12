@@ -20,7 +20,7 @@ import logging as log
 from lxml import etree
 import re
 
-from ..setup import RESOURCE_PATH, SEARCH_FILE, BERTModel, BIOBERT, NLPModel, METADATA, METADATA_FILE, WORKSPACE_DIR, url_to_curie, loadJson, getAllFilesInDir
+from ..setup import RESOURCE_PATH, SEARCH_FILE, BERTModel, BIOBERT, NLPModel, METADATA, METADATA_FILE, WORKSPACE_DIR, url_to_curie, loadJson, getAllFilesInDir, dumpJson
 from .sckan_crawler import extract_sckan_terms
 from .clusterer import CellmlClusterer
 
@@ -338,5 +338,4 @@ class PMRIndexer:
         ### updating METADATA
         from .. import __version__
         METADATA['pmrindexer_version'] = __version__
-        with open(METADATA_FILE, 'w') as f:
-            json.dump(METADATA, f)
+        dumpJson(METADATA, METADATA_FILE)

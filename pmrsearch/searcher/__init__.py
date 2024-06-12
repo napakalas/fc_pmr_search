@@ -8,12 +8,14 @@ from tqdm import tqdm
 import spacy
 import json
 import os
-import sqlite3
-import logging
+import logging as log
+from jsonschema import validate
+from jsonschema.exceptions import ValidationError
 
 #===============================================================================
 
-from ..setup import SEARCH_FILE, SCKAN_BIOBERT_FILE, CURRENT_PATH, BIOBERT, NLPModel, SCKAN2PMR, METADATA, METADATA_FILE, SCKAN2PMR_SQLITE
+from ..setup import SEARCH_FILE, SCKAN_BIOBERT_FILE, CURRENT_PATH, BIOBERT, NLPModel, SCKAN2PMR, METADATA, METADATA_FILE, SCHEMA_METADATA_FILE, SCHEMA_SCKAN2PMR_FILE
+from ..setup import dumpJson, loadJson
 
 TOP_K = 1000
 MIN_SIM = 0.6
@@ -38,7 +40,6 @@ class PMRSearcher:
 
         self.__model = SentenceTransformer(BIOBERT, device=device) if emb_model is None else emb_model
         self.__nlp = spacy.load(NLPModel) if nlp_model is None else nlp_model
-
         
         data = torch.load(SCKAN_BIOBERT_FILE, map_location=map_location)
         self.__sckan_ids = data['id']
@@ -184,32 +185,6 @@ class PMRSearcher:
                                 'exposure':[get_exposure(cellml_id)]}]
         return cellml_res
     
-    def generate_term_to_pmr(self, min_sim=MIN_SIM, exposure_only=True):
-        term2pmr = {}
-        logging.info('Generating map of SCKAN terms to PMR models')
-        for sckan_id in tqdm(self.__sckan_term.keys()):
-            if len(pmr_models := self.search_cellml(sckan_id, min_sim=min_sim)) > 0:
-                found_models = []
-                for pmr_model in pmr_models:
-                    if pmr_model[1] not in found_models:
-                        cellml = self.__cellmls[pmr_model[1]]
-                        workspace_dir = pmr_model[1][:pmr_model[1].index('rawfile')]
-                        new_model = {
-                            'cellml': pmr_model[1],
-                            'workspace': workspace_dir,
-                            'score': pmr_model[0]
-                            }
-                        if exposure_only and 'exposure' in cellml:
-                            new_model['exposure'] = cellml['exposure']
-                            found_models += [new_model]
-                        elif not exposure_only:
-                            if 'exposure' in cellml:
-                                new_model['exposure'] = cellml['exposure']
-                            found_models += [new_model]
-                if len(found_models) > 0:
-                    term2pmr[sckan_id] = found_models
-        return term2pmr
-
     def check_and_generate_annotation_completeness(self, annotation_file):
         missed = {}
         found = {}
@@ -232,19 +207,54 @@ class PMRSearcher:
         with open(anatomical_terms, 'w') as f:
             json.dump({'found':found, 'missed':missed}, f, indent=4)
 
+    def generate_term_to_pmr(self, min_sim=MIN_SIM, exposure_only=True):
+        term2pmr = []
+        log.info('Generating map of SCKAN terms to PMR models')
+        for sckan_id in tqdm(self.__sckan_term.keys()):
+            if len(pmr_models := self.search_cellml(sckan_id, min_sim=min_sim)) > 0:
+                found_models = []
+                for pmr_model in pmr_models:
+                    if pmr_model[1] not in found_models:
+                        cellml = self.__cellmls[pmr_model[1]]
+                        new_model = {
+                            'cellml': pmr_model[1],
+                            'workspace': cellml['workspace'],
+                            'score': pmr_model[0]
+                            }
+                        if exposure_only and 'exposure' in cellml:
+                            new_model['exposure'] = cellml['exposure']
+                            found_models += [new_model]
+                        elif not exposure_only:
+                            if 'exposure' in cellml:
+                                new_model['exposure'] = cellml['exposure']
+                            found_models += [new_model]
+                if len(found_models) > 0:
+                    term2pmr += [
+                        {
+                            "sckan_term": sckan_id,
+                            "cellmls": found_models
+                        }
+                    ]
+        return term2pmr
+
     def generate_term_to_pmr_save(self, min_sim=MIN_SIM, exposure_only=True):
         term2pmr = self.generate_term_to_pmr(min_sim=min_sim, exposure_only=exposure_only)
         # save to json file
-        with open(SCKAN2PMR, 'w') as f:
-            json.dump(term2pmr, f, indent=4)
+        dumpJson(term2pmr, SCKAN2PMR)
+        self.__validate_json(term2pmr, SCHEMA_SCKAN2PMR_FILE)
 
         # update METADATA
         METADATA['minimum_similarity'] = min_sim
         from .. import __version__
         METADATA['pmrindexer_version'] = __version__
-        with open(METADATA_FILE, 'w') as f:
-            json.dump(METADATA, f, indent=4)
+        dumpJson(METADATA, METADATA_FILE)
+        self.__validate_json(METADATA, SCHEMA_METADATA_FILE)
 
-        return
+    def __validate_json(self, data, schema_file):
+        schema = loadJson(schema_file)
+        try:
+            validate(instance=data, schema=schema)
+        except ValidationError as e:
+            print(e)
 
 #===============================================================================
