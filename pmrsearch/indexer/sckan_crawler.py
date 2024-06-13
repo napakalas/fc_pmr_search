@@ -1,18 +1,20 @@
 import rdflib
 import os
+import torch.backends
+import torch.backends.mps
 from tqdm import tqdm
 import logging
 import tempfile
 import requests
 import zipfile
-import pickle
 import json
 from rdflib.namespace import OWL, RDFS
 import torch
 import logging  as log
 import shutil
 
-from ..setup import SCKAN_GRAPH, METADATA, METADATA_FILE, url_to_curie, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_BIOBERT_FILE, request_json
+from ..setup import SCKAN_GRAPH, METADATA, METADATA_FILE, url_to_curie, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_BIOBERT_FILE
+from ..setup import request_json, dumpPickle
 
 NPO_OWNER = 'SciCrunch'
 NPO_REPO = 'NIF-Ontology'
@@ -58,8 +60,7 @@ def __load_sckan(sckan_path, dest_file):
             logging.error('Cannot load file: {}'.format(filename))
 
     if dest_file is not None:
-        with open(dest_file, 'wb') as f:
-            pickle.dump(g, f)
+        dumpPickle(g, dest_file)
 
     return g
 
