@@ -1,7 +1,4 @@
-import json
 import os
-import gzip
-import pickle
 import pandas as pd
 import re
 import rdflib
@@ -24,7 +21,7 @@ from ..setup import RESOURCE_PATH, SEARCH_FILE, BERTModel, BIOBERT, NLPModel, ME
 from .sckan_crawler import extract_sckan_terms
 from .clusterer import CellmlClusterer
 
-ONTO_DF = f'{RESOURCE_PATH}/ontoDf.gz'
+ONTO_DF = f'{RESOURCE_PATH}/ontoDf.zip'
 RS_WORKSPACE = f'{RESOURCE_PATH}/listOfWorkspace.json'
 
 ALPHA = 0.5
@@ -76,8 +73,7 @@ class PMRIndexer:
         self.__nlp_model.add_pipe("abbreviation_detector")
         self.__pmr_workspace_dir = pmr_workspace_dir if pmr_workspace_dir is not None else WORKSPACE_DIR
         self.__sckan_version = sckan_version
-        with gzip.GzipFile(pmr_onto, 'rb') as f:
-            self.__ontologies = pickle.load(f)
+        self.__ontologies = pd.read_csv(pmr_onto, index_col=0)
 
     def __sckan_search(self, query, model, sckan_embs, k=10, th=0.7):
         query_emb = model.encode(query, show_progress_bar=False,  convert_to_tensor=True)
