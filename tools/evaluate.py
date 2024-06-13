@@ -3,7 +3,11 @@ from pmrsearch import __version__
 import json
 import os
 
+#===============================================================================
+
 EVALUATION_FILE = f'{CURRENT_PATH}/output/evaluation_results-{__version__}.json'
+
+#===============================================================================
 
 def main():
     import argparse

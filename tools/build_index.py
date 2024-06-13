@@ -2,11 +2,13 @@
 from pmrsearch.indexer import PMRIndexer
 from pmrsearch.setup import WORKSPACE_DIR
 
+#===============================================================================
+
 def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Creating search index for SCKAN and PMR")
-    parser.add_argument('--workspace', dest='workspaceDir', help='Path to PMR workspaces')
+    parser.add_argument('--workspace', dest='workspaceDir', help='Path to PMR workspaces', default=WORKSPACE_DIR)
     parser.add_argument('--clean-extraction', dest='cleanExtraction', help='Clean extraction will crawl all knowledges', action='store_true')
     args = parser.parse_args()
 

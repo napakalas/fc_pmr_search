@@ -1,4 +1,3 @@
-from distutils.command import clean
 import logging
 import git.exc
 from pmrsearch.setup import getJsonFromPmr, getAllFilesInDir, getUrlFromPmr, dumpPickle, loadJson, dumpJson as dJson
@@ -224,19 +223,3 @@ class Workspaces(WorkspaceCollection):
                 except:
                     print('error', rdfPath)
         dumpPickle(graph, CURRENT_PATH, RESOURCE_PATH, 'rdf.graph')
-
-    def addCellml(self, id=None, url=None, cellmlId=None):
-        if id is not None:
-            url = self.getUrl(id)
-        if url in self.data:
-            if 'cellml' in self.data[url]:
-                if cellmlId not in self.data[url]['cellml']:
-                    self.data[url]['cellml'] += [cellmlId]
-            else:
-                self.data[url]['cellml'] = [cellmlId]
-
-    def extract(self, sysCellmls):
-        for _, data in sysCellmls.getData().items():
-            self.addCellml(url=data['workspace'], cellmlId=data['id'])
-        self.dumpJson()
-
