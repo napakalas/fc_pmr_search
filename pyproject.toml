@@ -28,6 +28,7 @@ scispacy = "0.5.4"
 hdbscan = "^0.8.36"
 gitpython = "^3.1.43"
 xmltodict = "^0.13.0"
+jsonschema = "^4.22.0"
 
 [tool.poetry.scripts]
 pmrsearch = 'pmrsearch.__main__:main'
