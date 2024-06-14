@@ -1,0 +1,37 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://sckan2pmr.com/sckan2pmr.schema.json",
+    "title": "SCKAN2PMR",
+    "description": "An array of objects containing mappings between SCKAN ontology terms and cellml models in the PMR.",
+    "type": "array",
+    "properties": {
+        "sckan_term": {
+            "description": "Ontology terms used in SCKAN",
+            "type": "string"
+        },
+        "cellmls": {
+            "description": "List of cellml files related to an ontology term",
+            "type": "array",
+            "properties":{
+                "cellml": {
+                    "description": "URL of the cellml file for the model in the Physiome Project",
+                    "type": "string"
+                },
+                "workspace": {
+                    "description": "URL of the workspace for the model in the Physiome Project",
+                    "type": "string"
+                },
+                "score": {
+                    "description": "Similarity score between ontology term and cellml file",
+                    "type": "number"
+                },
+                "exposure": {
+                    "description": "URL of the exposure for the model in the Physiome Project",
+                    "type": "string"
+                }
+            },
+            "required": ["cellml", "workspace", "score"]
+        }
+    },
+    "required": ["sckan_term", "cellmls"]
+}

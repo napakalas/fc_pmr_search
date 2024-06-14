@@ -21,16 +21,11 @@ class CellmlClusterer:
     A class to cluster cellml documents using HDBSCAN.
     Input arguments:
      - cellmls : a dictionary consisting data contained by RS_CELLML
-     - cellmlListFile : the path of RS_CELLML
-       (*note: cellmls and cellmlListFile are used interchangably).
      - featureType : the type of feature being use for clustering
        (the possible value: FEAT_DOCUMENTATION, FEAT_XPATH_DEEP, FEAT_XPATH_WIDE,
         FEAT_XPATH_STRUCT, FEAT_XPATH_DEEP_WIDE_STRUCT, FEAT_ALL)
     """
-    def __init__(self, workspace_dir, cellmls=None, cellmlListFile='', featureType=FEAT_XPATH_DEEP_WIDE_STRUCT):
-        if cellmls is None:
-            with open(cellmlListFile,'r') as f:
-                cellmls = json.load(f)
+    def __init__(self, workspace_dir, cellmls, featureType=FEAT_XPATH_DEEP_WIDE_STRUCT):
         self.__workspace_dir = workspace_dir
         self.featureType = featureType
         self.__clusteringCellmls(cellmls)

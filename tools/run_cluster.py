@@ -1,8 +1,10 @@
-
+import torch.backends.mps
 from pmrsearch.indexer.clusterer import CellmlClusterer
 from pmrsearch.setup import SEARCH_FILE, WORKSPACE_DIR
 from pprint import pprint
 import torch
+
+#===============================================================================
 
 def main():
     device = 'gpu' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'

@@ -1,7 +1,4 @@
-import json
 import os
-import gzip
-import pickle
 import pandas as pd
 import re
 import rdflib
@@ -20,11 +17,11 @@ import logging as log
 from lxml import etree
 import re
 
-from ..setup import RESOURCE_PATH, SEARCH_FILE, BERTModel, BIOBERT, NLPModel, METADATA, METADATA_FILE, WORKSPACE_DIR, url_to_curie, loadJson, getAllFilesInDir
+from ..setup import RESOURCE_PATH, SEARCH_FILE, BERTModel, BIOBERT, NLPModel, METADATA, METADATA_FILE, WORKSPACE_DIR, url_to_curie, loadJson, getAllFilesInDir, dumpJson
 from .sckan_crawler import extract_sckan_terms
 from .clusterer import CellmlClusterer
 
-ONTO_DF = f'{RESOURCE_PATH}/ontoDf.gz'
+ONTO_DF = f'{RESOURCE_PATH}/ontoDf.zip'
 RS_WORKSPACE = f'{RESOURCE_PATH}/listOfWorkspace.json'
 
 ALPHA = 0.5
@@ -65,12 +62,7 @@ def to_embedding(term_data, model, nlp_model):
 
 class PMRIndexer:
     def __init__(self, pmr_workspace_dir, bert_model=None, biobert_model=None, nlp_model=None, sckan_version=None, pmr_onto=ONTO_DF):
-        if torch.cuda.is_available():
-            device = 'gpu'
-        elif torch.backends.mps.is_available():
-            device = 'mps'
-        else:
-            device = 'cpu'
+        device = 'gpu' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
         log.info(f'loading {BERTModel}')
         self.__bert_model = SentenceTransformer(BERTModel, device=device) if bert_model is None else bert_model
         log.info(f'loading {BIOBERT}')
@@ -81,8 +73,7 @@ class PMRIndexer:
         self.__nlp_model.add_pipe("abbreviation_detector")
         self.__pmr_workspace_dir = pmr_workspace_dir if pmr_workspace_dir is not None else WORKSPACE_DIR
         self.__sckan_version = sckan_version
-        with gzip.GzipFile(pmr_onto, 'rb') as f:
-            self.__ontologies = pickle.load(f)
+        self.__ontologies = pd.read_csv(pmr_onto, index_col=0)
 
     def __sckan_search(self, query, model, sckan_embs, k=10, th=0.7):
         query_emb = model.encode(query, show_progress_bar=False,  convert_to_tensor=True)
@@ -123,7 +114,7 @@ class PMRIndexer:
                 if (file_type:=file_name[file_name.rfind('.') + 1:].lower()) == 'cellml': ## if cellml file found
                     cellml_url = f'{workspace_url}/rawfile/{workspace["commit"]}/{file_name[len(workspace_dir) + 1:]}'
                     if cellml_url not in self.__cellmls:
-                        self.__cellmls[cellml_url] = {'workspace': workspace, 'workingDir': workspace['workingDir'], 'rdfLeaves': []}
+                        self.__cellmls[cellml_url] = {'workspace': workspace_url, 'workingDir': workspace['workingDir'], 'rdfLeaves': []}
                         if cellml_url not in workspace: workspace['cellml'] = []
                         workspace['cellml'] += [cellml_url]
                         # extract from cellml xml
@@ -343,5 +334,4 @@ class PMRIndexer:
         ### updating METADATA
         from .. import __version__
         METADATA['pmrindexer_version'] = __version__
-        with open(METADATA_FILE, 'w') as f:
-            json.dump(METADATA, f)
+        dumpJson(METADATA, METADATA_FILE)

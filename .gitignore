@@ -161,16 +161,18 @@ cython_debug/
 
 .DS_Store
 
-
 pmrsearch/output/*
 !pmrsearch/output/.keep
 
 pmrsearch/resources/*
 !pmrsearch/resources/.keep
+!pmrsearch/resources/metadata.schema.json
+!pmrsearch/resources/sckan2pmr.schema.json
+!pmrsearch/resources/listOfWorkspace.json
+!pmrsearch/resources/ontoDf.zip
 
 pmrsearch/workspaces/*
 !pmrsearch/workspaces/.keep
 
-
-# pmrsearch/indexes/*
-# !pmrsearch/indexes/.keep
+pmrsearch/cache_dir/*
+!pmrsearch/cache_dir/.keep

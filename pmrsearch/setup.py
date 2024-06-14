@@ -20,7 +20,9 @@ SCKAN_GRAPH = f'{RESOURCE_PATH}/sckan.graph'
 SCKAN_TERMS = f'{RESOURCE_PATH}/sckan_terms.json'
 
 SCKAN2PMR =  f'{CURRENT_PATH}/output/sckan2pmr.json'
-SCKAN2PMR_SQLITE = f'{CURRENT_PATH}/output/sckan2pmr.db'
+
+SCHEMA_METADATA_FILE = f'{RESOURCE_PATH}/metadata.schema.json'
+SCHEMA_SCKAN2PMR_FILE = f'{RESOURCE_PATH}/sckan2pmr.schema.json'
 
 PMR_URL = 'https://models.physiomeproject.org/'
 
@@ -63,7 +65,7 @@ def loadJson(*paths):
 def dumpJson(data, *paths):
     file = os.path.join(CURRENT_PATH, *paths)
     with open(file, 'w') as fp:
-        json.dump(data, fp)
+        json.dump(data, fp, indent=4)
     fp.close()
 
 def getJsonFromPmr(url):
