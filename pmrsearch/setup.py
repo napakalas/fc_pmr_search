@@ -18,6 +18,7 @@ SCKAN_BIOBERT_FILE = f'{CURRENT_PATH}/indexes/sckan_biobert.pt'
 SCKAN_TERMS = f'{CURRENT_PATH}/indexes/sckan_terms.json'
 
 SCKAN2PMR =  f'{CURRENT_PATH}/output/sckan2pmr.json'
+SCKAN_GRAPH = f'{CURRENT_PATH}/resources/sckan.graph'
 
 SCHEMA_METADATA_FILE = f'{RESOURCE_PATH}/metadata.schema.json'
 SCHEMA_SCKAN2PMR_FILE = f'{RESOURCE_PATH}/sckan2pmr.schema.json'
