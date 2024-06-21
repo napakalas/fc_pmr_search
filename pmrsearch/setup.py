@@ -15,14 +15,16 @@ WORKSPACE_DIR = f'{CURRENT_PATH}/workspaces'
 SEARCH_FILE = f'{CURRENT_PATH}/indexes/search_data.pt'
 SCKAN_BERT_FILE = f'{CURRENT_PATH}/indexes/sckan_bert.pt'
 SCKAN_BIOBERT_FILE = f'{CURRENT_PATH}/indexes/sckan_biobert.pt'
-
-SCKAN_GRAPH = f'{RESOURCE_PATH}/sckan.graph' 
-SCKAN_TERMS = f'{RESOURCE_PATH}/sckan_terms.json'
+SCKAN_TERMS = f'{CURRENT_PATH}/indexes/sckan_terms.json'
 
 SCKAN2PMR =  f'{CURRENT_PATH}/output/sckan2pmr.json'
+SCKAN_GRAPH = f'{CURRENT_PATH}/resources/sckan.graph'
 
 SCHEMA_METADATA_FILE = f'{RESOURCE_PATH}/metadata.schema.json'
 SCHEMA_SCKAN2PMR_FILE = f'{RESOURCE_PATH}/sckan2pmr.schema.json'
+SCHEMA_EXPOSURES_FILE = f'{RESOURCE_PATH}/exposures.schema.json'
+
+EXPOSURES_FILE = f'{CURRENT_PATH}/output/exposures.json'
 
 PMR_URL = 'https://models.physiomeproject.org/'
 
@@ -33,8 +35,11 @@ NLPModel = 'en_core_sci_lg'
 LOOKUP_TIMEOUT = 30
 
 METADATA_FILE = f'{CURRENT_PATH}/output/metadata.json'
-with open(METADATA_FILE, 'r') as f:
-    METADATA = json.load(f)
+if os.path.exists(METADATA_FILE):
+    with open(METADATA_FILE, 'r') as f:
+        METADATA = json.load(f)
+else:
+    METADATA = {}
 
 def url_to_curie(url):
     if url.startswith('http'):

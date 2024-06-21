@@ -1,3 +1,5 @@
+#===============================================================================
+
 import rdflib
 import os
 import torch.backends
@@ -13,8 +15,12 @@ import torch
 import logging  as log
 import shutil
 
-from ..setup import SCKAN_GRAPH, METADATA, METADATA_FILE, url_to_curie, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_BIOBERT_FILE
-from ..setup import request_json, dumpPickle
+#===============================================================================
+
+from ..setup import METADATA, METADATA_FILE, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_BIOBERT_FILE, SCKAN_GRAPH
+from ..setup import request_json, dumpJson, url_to_curie
+
+#===============================================================================
 
 NPO_OWNER = 'SciCrunch'
 NPO_REPO = 'NIF-Ontology'
@@ -33,6 +39,8 @@ def __get_ttl(path):
     ttl_files = []
     other_files = []
     for folder in next(os.walk(path), (None, None, []))[1:]:
+        if folder is None:
+            continue
         for p in folder:
             np = os.path.join(path, p)
             if os.path.isdir(np):
@@ -58,9 +66,6 @@ def __load_sckan(sckan_path, dest_file):
             g.parse(filename)
         except Exception:
             logging.error('Cannot load file: {}'.format(filename))
-
-    if dest_file is not None:
-        dumpPickle(g, dest_file)
 
     return g
 
@@ -114,7 +119,7 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
     store_as = SCKAN_GRAPH if store_as is None else store_as
     if not clean_extraction and METADATA.get('sckan_version', '') == sckan_version:
         try:
-            if (METADATA.get('sckan_version', '') == sckan_version or sckan_version is None) and os.path.exists(store_as):
+            if (METADATA.get('sckan_version', '') == sckan_version or sckan_version is None):
                 with open(SCKAN_TERMS, 'r') as f:
                     sckan_terms = json.load(f)
                 map_location = torch.device(device)
@@ -133,8 +138,7 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
     for k, v in npo_release.items():
         METADATA[k] = v
     # save metadata
-    with open(METADATA_FILE, 'w') as f:
-        json.dump(METADATA, f)
+    dumpJson(METADATA, METADATA_FILE)
     
     sckan_terms = {}
     for s, p, o in tqdm(g):
@@ -184,8 +188,7 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
     sckan_biobert_embs = {'id': list(sckan_biobert.keys()), 'embs': torch.stack(list(sckan_biobert.values()))}
 
     # save to files
-    with open(SCKAN_TERMS, 'w') as f:
-        json.dump(sckan_terms, f)
+    dumpJson(sckan_terms, SCKAN_TERMS)
     torch.save(sckan_bert_embs, SCKAN_BERT_FILE)
     torch.save(sckan_biobert_embs, SCKAN_BIOBERT_FILE)
 

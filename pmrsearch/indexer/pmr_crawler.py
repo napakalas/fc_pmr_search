@@ -15,14 +15,12 @@ class PmrCollection:
         self.paths = paths
         if len(self.dataDict)==0:
             self.dataDict['data'] = {}
-        self.statusC = {}
         self.data = self.dataDict['data']
 
     def getJson(self):
         return self.dataDict
 
     def dumpJson(self):
-        self.dataDict['status'] = self.statusC
         for k, v in self.dataDict['data'].items():
             if isinstance(v,dict):
                 self.dataDict['vars'] = list(v.keys())
@@ -79,7 +77,6 @@ class WorkspaceCollection(PmrCollection):
     def __init__(self, *paths):
         super().__init__(*paths)
         self.allWksDir = os.path.join(WORKSPACE_DIR)
-        self.statusC = {'deprecated': 0, 'current': 1, 'validating': 2}
 
     def getCommit(self, url):
         return self.data.get(url,{}).get('commit', 'HEAD')
@@ -170,6 +167,8 @@ class Workspaces(WorkspaceCollection):
                 g = git.cmd.Git(path)
                 g.pull()
                 self.data[url]['commit'] = remoteCommit
+                self.data[url]['hasExtracted'] = False
+                self.data[url]['cellml'] = False
         except Exception as e:
             print('\n', e, '\n\t', url, ', repo commit: %s' %
                   (repoCommit), ', workingDir: ', workingDir, '\n')

@@ -174,5 +174,4 @@ pmrsearch/resources/*
 pmrsearch/workspaces/*
 !pmrsearch/workspaces/.keep
 
-pmrsearch/cache_dir/*
-!pmrsearch/cache_dir/.keep
+pmrsearch/indexes/archives/*

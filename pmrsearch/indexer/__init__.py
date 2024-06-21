@@ -1,4 +1,5 @@
 import os
+import select
 import pandas as pd
 import re
 import rdflib
@@ -97,24 +98,78 @@ class PMRIndexer:
             for r2_ids in r2:
                 if r2_ids in r1:
                     return (r2_ids, r2[r2_ids][0], (r2[r2_ids][1]+r1[r2_ids][1])/2)
-                
-    def __extract_pmr(self):
+
+    def __get_cellml_documentation(self, html_path):
+        # pattern to handle abbreviations
+        pattern = r'\((\w+)s\)'
+
+        documentation = []
+        try:
+            file_name = codecs.open(html_path, "r", "utf-8")
+            soup = BeautifulSoup(file_name.read(), 'lxml')
+        except Exception:
+            file_name = codecs.open(html_path, "r", "latin-1")
+            soup = BeautifulSoup(file_name.read(), "lxml")
+        
+        if soup.title is not None:
+            title = re.sub(pattern, r'(\1)', str(soup.title.text))
+            if title != '':
+                documentation += [title]
+        
+        paragraphs = soup.find_all('p') + soup.find_all('para')
+        for p in paragraphs:
+            if p is not None:
+                try:
+                    p = re.sub('\s+', ' ', p.text).strip()
+                    p = re.sub(pattern, r'(\1)', p)
+                    if len(p.split()) > 50 and len(p) > 250:
+                        documentation += p.split('. ')
+                except Exception:
+                    log.warning(f'Cannot load a paragraph from {file_name}')
+        return list(set(documentation))
+
+    def __extract_pmr(self, clean_extraction):
         ### Parsing all cellml and rdf files from workspaces
+        
+        # load available search_data
+        search_data = torch.load(SEARCH_FILE)
+        if clean_extraction:
+            search_data = {}
+
+        # initialisation
         term_ids = []
-        file_types = ['cellml', 'rdf']
-        self.__workspaces = loadJson(RS_WORKSPACE)['data']
-        self.__cellmls = {}
-        cellml_to_terms, term_to_cellml = {}, {}
-        for workspace_url, workspace in self.__workspaces.items():
+        all_documentation = []
+        file_types = ['cellml', 'rdf', 'html', 'md', 'rst']
+        workspaces = loadJson(RS_WORKSPACE)['data']
+        
+        cellml_to_terms = {}
+
+        # filter workspaces based on clean_extraction
+        if clean_extraction:
+            selected_workspaces = workspaces
+            cellmls = {}
+        else:
+            cellmls = search_data['cellml']
+            selected_workspaces = {}
+            for workspace_url, workspace in workspaces.items():
+                if not workspace['hasExtracted']:
+                    selected_workspaces[workspace_url] = workspace
+                    for cellml_url in workspace.get('cellml'):
+                        del cellmls[cellml_url]
+
+
+        # sckan all workspaces
+        for workspace_url, workspace in selected_workspaces.items():
             workspace_dir = os.path.join(self.__pmr_workspace_dir, workspace['workingDir'])
             all_files = [file for file in getAllFilesInDir(workspace_dir)
                         if any(file.endswith(ext) for ext in file_types)]
             g_rdf = rdflib.Graph()
+            workspace_documentation = []
             for file_name in all_files:
                 if (file_type:=file_name[file_name.rfind('.') + 1:].lower()) == 'cellml': ## if cellml file found
                     cellml_url = f'{workspace_url}/rawfile/{workspace["commit"]}/{file_name[len(workspace_dir) + 1:]}'
-                    if cellml_url not in self.__cellmls:
-                        self.__cellmls[cellml_url] = {'workspace': workspace_url, 'workingDir': workspace['workingDir'], 'rdfLeaves': []}
+                    if cellml_url not in cellmls:
+                        cellmls[cellml_url] = {'workspace': workspace_url, 'workingDir': workspace['workingDir'], 'rdfLeaves': []}
                         if cellml_url not in workspace: workspace['cellml'] = []
                         workspace['cellml'] += [cellml_url]
                         # extract from cellml xml
@@ -126,33 +181,45 @@ class PMRIndexer:
                                 g.parse(data=etree.tostring(rdfElement), format="application/rdf+xml")
                             except:
                                 log.error(f'Cannot parse RDF in {cellml_url}')
-                        self.__cellmls[cellml_url]['rdfLeaves'] += [url_to_curie(str(o)) for o in g.objects() if url_to_curie(str(o)) is not None]
-                        term_ids += self.__cellmls[cellml_url]['rdfLeaves']
+                        cellmls[cellml_url]['rdfLeaves'] += [url_to_curie(str(o)) for o in g.objects() if url_to_curie(str(o)) is not None]
+                        term_ids += cellmls[cellml_url]['rdfLeaves']
                         # add exposure information
                         if 'exposures' in workspace:
-                            self.__cellmls[cellml_url]['exposure'] = list(workspace['exposures'].keys())[-1]
+                            cellmls[cellml_url]['exposure'] = list(workspace['exposures'].keys())[-1]
                         # add sha information
-                        self.__cellmls[cellml_url]['sha'] = workspace['commit']
-                        # add relative cellml path to its workspace
-                        self.__cellmls[cellml_url]['cellml'] = file_name[len(workspace_dir) + 1:]
+                        cellmls[cellml_url]['sha'] = workspace['commit']
+                        # add relative cellml path 
+                        cellmls[cellml_url]['cellml'] = file_name[len(workspace_dir) + 1:]
+                        # add cellml_url to its workspace
+                        if 'cellml' not in workspace:
+                            workspace['cellml'] = []
+                        workspace['cellml'] += [cellml_url]
+                        # update documentation
+                        cellmls[cellml_url]['documentation'] = self.__get_cellml_documentation(file_name)
+                        all_documentation += [cellmls[cellml_url]['documentation']]
                 elif file_type == 'rdf': ## if rdf file found, add to cellml files
                     try:
                         g_rdf.parse(file_name)
                     except:
                         log.error(f'Cannot parse RDF in {file_name}')
+                elif file_type in ['html', 'md', 'rst']:
+                    workspace_documentation += self.__get_cellml_documentation(file_name)
+            
             for cellml_url in workspace.get('cellml', []):
-                self.__cellmls[cellml_url]['rdfLeaves'] = list(set(self.__cellmls[cellml_url]['rdfLeaves'] + list(g_rdf.objects())))
-                ## load cellml_to_terms and term_to_cellml
-                cellml_to_terms[cellml_url] = self.__cellmls[cellml_url]['rdfLeaves']
-                for term_id in self.__cellmls[cellml_url]['rdfLeaves']:
-                    if term_id not in term_to_cellml:
-                        term_to_cellml[term_id] = []
-                    term_to_cellml[term_id] += [cellml_url]
+                cellmls[cellml_url]['rdfLeaves'] = list(set(cellmls[cellml_url]['rdfLeaves'] + list(g_rdf.objects())))
+                # extract documentation
+                cellmls[cellml_url]['documentation'] = list(set(cellmls[cellml_url]['documentation']+workspace_documentation))
+                ## load cellml_to_terms
+                cellml_to_terms[cellml_url] = cellmls[cellml_url]['rdfLeaves']
 
             term_ids += [url_to_curie(str(o)) for o in g_rdf.objects() if url_to_curie(str(o)) is not None]
+            all_documentation += workspace_documentation
+            
+            # update workspace, stated hat it has been extracted
+            workspace['hasExtracted'] = True
 
         ### Get term's label, synonym, etc for ontology type 
-        terms = {}
+        pmr_terms = {}
         for term_id in set(term_ids):
             if term_id in self.__ontologies.index:
                 term = {'label':'', 'def':'', 'synonym':[], 'is_a':[], 'is_a_text':[]}
@@ -166,11 +233,11 @@ class PMRIndexer:
                     substrs = onto['is_a'].split('|')
                     term['is_a'] = [s.split(' ! ')[0] for s in substrs]
                     term['is_a_text'] = list(set([self.__ontologies.loc[t]['name'] for t in term['is_a']]))
-                terms[term_id] = term
+                pmr_terms[term_id] = term
 
         ### Create term embeddings
         term_embeddings = {'id':[], 'embs':[]}
-        for term_id, term_data in tqdm(terms.items()):
+        for term_id, term_data in tqdm(pmr_terms.items()):
             term_embeddings['id'] += [term_id]
             term_embeddings['embs'] += [to_embedding(term_data, self.__biobert_model, self.__nlp_model)]
         
@@ -183,121 +250,104 @@ class PMRIndexer:
                 return tmp_term_embeddings[term_id]
             tmp_term_embeddings[term_id] = to_embedding(term_data, self.__biobert_model, self.__nlp_model)
             return tmp_term_embeddings[term_id]
-        
-        # exploring cellml files for any documentation except RDF annotation
-        
+
+
+        # prepare for doc_term_embeddings
         umls_types = ({'T0'+str(i) for i in range(16,32)} | {'T0'+str(i) for i in range(38,46)}) - {'T041', 'T028'}
-        # pattern to handle abbreviations
-        pattern = r'\((\w+)s\)'
+        doc_termids = {}
+        doc_ents = {}
+        all_documentation = list(set(all_documentation))
+        docs = self.__nlp_model.pipe(all_documentation)
+        all_ents, abbrs = [], {}
+        not_confirm_terms = {}
+        for idx, doc in enumerate(docs):
+            doc_termids[all_documentation[idx]] = {'confirm':[], 'not_confirm':[]}
+            doc_ents[all_documentation[idx]] = [ent.text for ent in doc.ents]
+            all_ents += doc_ents[all_documentation[idx]]
+            # update abbreviation
+            for abrv in doc._.abbreviations:
+                abbrs[abrv.text] = abrv._.long_form.text
 
-        
-
-        for cellml_id, cellml in tqdm(self.__cellmls.items()):
-            file_name = os.path.join(self.__pmr_workspace_dir, cellml['workingDir'], cellml['cellml'])
-            cellml_dir = os.path.dirname(file_name)
-            documentation = []
-            for file_name in os.listdir(cellml_dir):
-                if file_name.endswith('.html') or file_name.endswith('.md') or file_name.endswith('.rst') or cellml['cellml'] == file_name:
-                    html_path = os.path.join(cellml_dir,file_name)
-                    try:
-                        file_name = codecs.open(html_path, "r", "utf-8")
-                        soup = BeautifulSoup(file_name.read(), 'lxml')
-                    except Exception:
-                        file_name = codecs.open(html_path, "r", "latin-1")
-                        soup = BeautifulSoup(file_name.read(), "lxml")
-                    
-                    if soup.title is not None:
-                        title = re.sub(pattern, r'(\1)', str(soup.title.text))
-                        if title != '':
-                            documentation += [title]
-                    
-                    paragraphs = soup.find_all('p') + soup.find_all('para')
-                    for p in paragraphs:
-                        if p is not None:
-                            try:
-                                p = re.sub('\s+', ' ', p.text).strip()
-                                p = re.sub(pattern, r'(\1)', p)
-                                if len(p.split()) > 50 and len(p) > 250:
-                                    documentation += p.split('. ')
-                            except Exception:
-                                log.warning(f'Cannot load a paragraph from {file_name}')
-
-            documentation = list(set(documentation))
-                    
-            # process if documentation is available
-            if len(documentation)>0:
-                cellml['documentation'] = documentation
-                docs = self.__nlp_model.pipe(documentation)
-                ents, abbrs = {}, {}
-                for doc in docs:
-                    for ent in doc.ents:
-                        ents[ent.text] = ent
-                    for abrv in doc._.abbreviations:
-                        abbrs[abrv.text] = abrv._.long_form.text
+            for ent in doc.ents:
+                # converting abbreviation to long-term
+                ent_txt = abbrs[ent.text] if ent.text in abbrs else ent.text
+                # cannot justify the correct classification if the entity text is too short:
+                if len(ent_txt) <= 2 and '// ' in ent_txt:
+                    continue
+            
+                # term_id = kb_ent[0]
+                # link = linker.kb.cui_to_entity[term_id]
                 
-                # create cellml embedding as a combination of entity embeddings
-                if len(ents) == 0:
-                    cellml_emb = torch.mean(self.__biobert_model.encode(documentation, convert_to_tensor=True), 0)
+                # extract from ontology lookup
+                cand = self.__get_sckan_candidate(ent_txt)
+
+                if cand is not None:
+                    term_id = cand[0]
+                    doc_termids[all_documentation[idx]]['confirm'] += [term_id]
                 else:
-                    cellml_emb = torch.mean(self.__biobert_model.encode(list(ents.keys()), convert_to_tensor=True), 0)
-                
-                for ent_txt, ent in ents.items():
-                    # converting abbreviation to long-term
-                    ent_txt = abbrs[ent_txt] if ent_txt in abbrs else ent_txt
-                    
-                    # cannot justify the correct classification if the entity text is too short:
-                    if len(ent_txt) <= 2 and '// ' in ent_txt:
-                        continue
-                    # term_id = kb_ent[0]
-                    # link = linker.kb.cui_to_entity[term_id]
-                    
-                    # extract from ontology lookup
-                    cand = self.__get_sckan_candidate(ent_txt)
-
-                    if cand is not None:
-                        term_id = cand[0]
-                        # get the embedding first
-                        terms[term_id] = self.__sckan_terms[term_id]
+                    for kb_ent in ent._.kb_ents:
+                    # extract from umls
+                        term_id = kb_ent[0]
+                        link = self.__linker.kb.cui_to_entity[term_id]
+                        if len(set(link.types) & umls_types) > 0:
+                            # add terms
+                            label = link.canonical_name
+                            definition = link.definition if link.definition is not None else []
+                            synonym = link.aliases if link.aliases is not None else []
+                            is_a = link.types
+                            is_a_text = [self.__linker.kb.semantic_type_tree.get_canonical_name(t) for t in is_a]
+                            term_data = {'label':label, 'def':definition, 'synonym':synonym, 'is_a':is_a, 'is_a_text':is_a_text}
+                            get_term_embedding(term_id, term_data)
+                            doc_termids[all_documentation[idx]]['not_confirm'] += [term_id]
+                            not_confirm_terms[term_id] = term_data
+        
+        # now checking all cellml
+        all_ents = list(set(all_ents))
+        doc_embeddings = self.__biobert_model.encode(all_documentation, convert_to_tensor=True)
+        ent_embeddings = self.__biobert_model.encode(all_ents, convert_to_tensor=True)
+        
+        # exploring cellml files for any documentation
+        for cellml_id, cellml in tqdm(cellmls.items()):
+            if len(cellml_ents:=[ent for doc in cellml['documentation'] for ent in doc_ents[doc]]) == 0:
+                cellml_emb = torch.mean(torch.stack([doc_embeddings[all_documentation.index(doc)] for doc in cellml['documentation']]), dim=0)
+            else:
+                cellml_emb = torch.mean(torch.stack([ent_embeddings[all_ents.index(cellml_ent)] for cellml_ent in cellml_ents]), dim=0)
+            # check not_confirm term_id
+            for doc in cellml['documentation']:
+                for term_id in set(doc_termids[doc]['not_confirm']):
+                    if util.cos_sim(tmp_term_embeddings[term_id], cellml_emb) >= 0.9:
+                        pmr_terms[term_id] = not_confirm_terms[term_id]
                         term_embeddings['id'] += [term_id]
-                        idx = self.__sckan_biobert_embs['id'].index(term_id)
-                        term_emb = self.__sckan_biobert_embs['embs'][idx]
-                        term_embeddings['embs'] += [term_emb]
+                        term_embeddings['embs'] += [tmp_term_embeddings[term_id]]
                         if cellml_id not in cellml_to_terms:
                             cellml_to_terms[cellml_id] = []
                         cellml_to_terms[cellml_id] += [term_id]
-                        if term_id not in term_to_cellml:
-                            term_to_cellml[term_id] = []
-                        term_to_cellml[term_id] += [cellml_id]
+                for term_id in set(doc_termids[doc]['confirm']):
+                    pmr_terms[term_id] = self.__sckan_terms[term_id]
+                    term_embeddings['id'] += [term_id]
+                    idx = self.__sckan_biobert_embs['id'].index(term_id)
+                    term_emb = self.__sckan_biobert_embs['embs'][idx]
+                    term_embeddings['embs'] += [term_emb]
+                    if cellml_id not in cellml_to_terms:
+                        cellml_to_terms[cellml_id] = []
+                    cellml_to_terms[cellml_id] += [term_id]
 
-                    else:
-                        for kb_ent in ent._.kb_ents:
-                        # extract from umls
-                            term_id = kb_ent[0]
-                            link = self.__linker.kb.cui_to_entity[term_id]
-                            if len(set(link.types) & umls_types) > 0:
-                                # add terms
-                                label = link.canonical_name
-                                definition = link.definition if link.definition is not None else []
-                                synonym = link.aliases if link.aliases is not None else []
-                                is_a = link.types
-                                is_a_text = [self.__linker.kb.semantic_type_tree.get_canonical_name(t) for t in is_a]
-                                term_data = {'label':label, 'def':definition, 'synonym':synonym, 'is_a':is_a, 'is_a_text':is_a_text}
-                                term_emb = get_term_embedding(term_id, term_data)
-                                if util.cos_sim(term_emb, cellml_emb) >= 0.9:
-                                    terms[term_id] = term_data
-                                    term_embeddings['id'] += [term_id]
-                                    term_embeddings['embs'] += [term_emb]
-                                    if cellml_id not in cellml_to_terms:
-                                        cellml_to_terms[cellml_id] = []
-                                    cellml_to_terms[cellml_id] += [term_id]
-                                    if term_id not in term_to_cellml:
-                                        term_to_cellml[term_id] = []
-                                    term_to_cellml[term_id] += [cellml_id]
+            cellml_embeddings['id'] += [cellml_id]
+            cellml_embeddings['embs'] += [cellml_emb]
 
-                cellml_embeddings['id'] += [cellml_id]
-                cellml_embeddings['embs'] += [cellml_emb]
-        
-        return terms, term_to_cellml, term_embeddings, cellml_embeddings
+        # modify cellml_to_term as term_to_cellml
+        term_to_cellml = {}
+        for cellml_id, cellml_terms in cellml_to_terms.items():
+            for term_id in cellml_terms:
+                if term_id not in term_to_cellml:
+                    term_to_cellml[term_id] = []
+                term_to_cellml[term_id] += [cellml_id]
+
+        # dump workspaces
+        dumpJson(workspaces, RS_WORKSPACE)
+
+        # return results
+        return cellmls, pmr_terms, term_to_cellml, term_embeddings, cellml_embeddings
 
     def create_search_index(self, clean_extraction=True):
         self.__sckan_terms, self.__sckan_bert_embs, self.__sckan_biobert_embs = extract_sckan_terms(
@@ -312,20 +362,20 @@ class PMRIndexer:
         
         log.info(f'SCKAN has {self.__sckan_bert_embs["embs"].shape} terms of {BERTModel} and {self.__sckan_biobert_embs["embs"].shape} terms of {BIOBERT}')
 
-        pmr_terms, term_to_cellml , term_embeddings, cellml_embeddings = self.__extract_pmr()
+        cellmls, pmr_terms, term_to_cellml , term_embeddings, cellml_embeddings = self.__extract_pmr(clean_extraction)
 
-        pmr_clusterer = CellmlClusterer(workspace_dir=self.__pmr_workspace_dir, cellmls=self.__cellmls)
+        pmr_clusterer = CellmlClusterer(workspace_dir=self.__pmr_workspace_dir, cellmls=cellmls)
 
         combined_data = {
-            'term':term_embeddings['id'], 
-            'embedding':torch.stack(term_embeddings['embs']),
-            'pmrTerm':pmr_terms, 
-            'sckanTerm':self.__sckan_terms, 
-            'cellml':self.__cellmls, 
-            'cluster':pmr_clusterer.getDict(),
-            'termCellml':term_to_cellml, 
-            'cellmlId': cellml_embeddings['id'], 
-            'cellmlEmbs':torch.stack(cellml_embeddings['embs'])
+            'term':term_embeddings['id'],                       # a list of term having embedding
+            'embedding':torch.stack(term_embeddings['embs']),   # an array of term embedding
+            'pmrTerm':pmr_terms,                                # a dictionary of terms in the PMR
+            'sckanTerm':self.__sckan_terms,                     # a dictionary of terms in SCKAN
+            'cellml':cellmls,                                   # a dictionary of CellML files
+            'cluster':pmr_clusterer.getDict(),                  # a dictionary of CellML cluster
+            'termCellml':term_to_cellml,                        # a dictionay terms in CellML files
+            'cellmlId': cellml_embeddings['id'],                # a list of CellML files having embedding
+            'cellmlEmbs':torch.stack(cellml_embeddings['embs']) # an array of CellML embedding
             }
 
         ### safe to file

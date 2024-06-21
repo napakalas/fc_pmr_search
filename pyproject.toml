@@ -17,7 +17,6 @@ python = ">=3.10,<4.0"
 sentence-transformers = "3.0.0"
 pandas = "2.1.0"
 beautifulsoup4 = "^4.12.2"
-rdflib = "^7.0.0"
 torch = "^2.0.1"
 torchvision = "^0.15.2"
 nmslib = {url = "https://idealoom.org/wheelhouse/nmslib-2.1.1-cp310-cp310-macosx_12_0_arm64.whl"}
@@ -29,6 +28,7 @@ hdbscan = "^0.8.36"
 gitpython = "^3.1.43"
 xmltodict = "^0.13.0"
 jsonschema = "^4.22.0"
+mapknowledge = {url = "https://github.com/AnatomicMaps/map-knowledge/releases/download/v0.18.1/mapknowledge-0.18.1-py3-none-any.whl"}
 
 [tool.poetry.scripts]
 pmrsearch = 'pmrsearch.__main__:main'
