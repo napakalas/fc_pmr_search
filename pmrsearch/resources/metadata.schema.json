@@ -2,13 +2,9 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://sckan2pmr.com/metadata.schema.json",
     "title": "SCKAN2PMR metadata",
-    "description": "Metadata of SCKAN2PMR results.",
+    "description": "An object specifying files and SCKAN used in a particular version.",
     "type": "object",
     "properties": {
-        "sckan_url": {
-            "description": "URL of SCKAN to download sources",
-            "type": "string"
-        },
         "pmrindexer_version": {
             "description": "The version of pmrindexer to generate SCKAN2PMR",
             "type": "string"
@@ -28,7 +24,14 @@
         "sckan_path": {
             "description": "Path of SCKAN repo related to the SCKAN version",
             "type": "string"
+        },
+        "files": {
+            "description": "List of files in a release",
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
         }
     },
-    "required": ["sckan_url", "pmrindexer_version", "minimum_similarity", "sckan_sha", "sckan_version", "sckan_path"]
+    "required": ["pmrindexer_version", "minimum_similarity", "sckan_sha", "sckan_version", "sckan_path", "files"]
 }
