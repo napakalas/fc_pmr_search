@@ -5,6 +5,10 @@
     "description": "An object specifying files and SCKAN used in a particular version.",
     "type": "object",
     "properties": {
+        "sckan_url": {
+            "description": "URL of SCKAN to download sources",
+            "type": "string"
+        },
         "pmrindexer_version": {
             "description": "The version of pmrindexer to generate SCKAN2PMR",
             "type": "string"
