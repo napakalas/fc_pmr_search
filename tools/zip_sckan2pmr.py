@@ -1,7 +1,7 @@
 import json
 import zipfile
 import os
-from pmrsearch.setup import METADATA_FILE, SCKAN2PMR, SCHEMA_METADATA_FILE, SCHEMA_SCKAN2PMR_FILE, CURRENT_PATH
+from pmrsearch.setup import METADATA_FILE, SCKAN2PMR, EXPOSURES_FILE, SCHEMA_METADATA_FILE, SCHEMA_SCKAN2PMR_FILE, SCHEMA_EXPOSURES_FILE, CURRENT_PATH
 
 #===============================================================================
 
@@ -15,7 +15,7 @@ if os.path.exists(release_path):
 
 compression = zipfile.ZIP_DEFLATED
 zf = zipfile.ZipFile(release_path, mode="w")
-for file_path in [METADATA_FILE, SCKAN2PMR, SCHEMA_METADATA_FILE, SCHEMA_SCKAN2PMR_FILE]:
+for file_path in [METADATA_FILE, SCKAN2PMR, EXPOSURES_FILE, SCHEMA_METADATA_FILE, SCHEMA_SCKAN2PMR_FILE, SCHEMA_EXPOSURES_FILE]:
     zf.write(file_path, file_path.split('/')[-1], compression)
 zf.close()
 
