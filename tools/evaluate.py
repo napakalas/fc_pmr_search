@@ -1,4 +1,4 @@
-from pmrsearch.setup import SCKAN2PMR, CURRENT_PATH
+from pmrsearch.setup import SCKAN2PMR, CURRENT_PATH, dumpJson
 from pmrsearch import __version__
 import json
 import os
@@ -37,8 +37,7 @@ def main():
                     new_value['results'] = sckan2pmr[term_id]
                     found[term_id] = [new_value]
 
-    with open(EVALUATION_FILE, 'w') as f:
-        json.dump({'found':found, 'missed':missed}, f, indent=4)
+    dumpJson({'found':found, 'missed':missed}, EVALUATION_FILE)
     
     print('Found:', len(found), '; missed:', len(missed))
     
