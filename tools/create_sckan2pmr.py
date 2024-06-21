@@ -12,7 +12,7 @@ def main():
     args = parser.parse_args()
 
     searcher = PMRSearcher()
-    searcher.generate_term_to_pmr_save(min_sim=args.minimalSimilarity, exposure_only=args.exposureOnly)
+    searcher.generate_and_save_sckan2pmr(min_sim=args.minimalSimilarity, exposure_only=args.exposureOnly)
 
 #===============================================================================
 
