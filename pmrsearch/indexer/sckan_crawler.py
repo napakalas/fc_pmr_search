@@ -17,7 +17,7 @@ import shutil
 
 #===============================================================================
 
-from ..setup import METADATA, METADATA_FILE, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_BIOBERT_FILE, SCKAN_GRAPH
+from ..setup import METADATA, METADATA_FILE, SCKAN_TERMS, SCKAN_BERT_FILE, SCKAN_BIOBERT_FILE, SCKAN_GRAPH, LOOKUP_TIMEOUT
 from ..setup import request_json, dumpJson, url_to_curie
 
 #===============================================================================
@@ -75,7 +75,7 @@ def __download_sckan(url):
     temp_zip_file_path = os.path.join(temp_dir, "release.zip")
     try:
         # Send an HTTP GET request to the GitHub raw file URL
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=LOOKUP_TIMEOUT)
 
         # Check if the request was successful (status code 200)
         if response.status_code == 200:
