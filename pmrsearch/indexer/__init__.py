@@ -21,8 +21,8 @@ import re
 from ..setup import RESOURCE_PATH, SEARCH_FILE, BERTModel, BIOBERT, NLPModel, METADATA, METADATA_FILE, WORKSPACE_DIR, url_to_curie, loadJson, getAllFilesInDir, dumpJson
 from .sckan_crawler import extract_sckan_terms
 from .clusterer import CellmlClusterer
+from .ontology_crawler import load_ontologies
 
-ONTO_DF = f'{RESOURCE_PATH}/ontoDf.zip'
 RS_WORKSPACE = f'{RESOURCE_PATH}/listOfWorkspace.json'
 
 ALPHA = 0.5
@@ -62,7 +62,7 @@ def to_embedding(term_data, model, nlp_model):
     return embs
 
 class PMRIndexer:
-    def __init__(self, pmr_workspace_dir, bert_model=None, biobert_model=None, nlp_model=None, sckan_version=None, pmr_onto=ONTO_DF):
+    def __init__(self, pmr_workspace_dir, bert_model=None, biobert_model=None, nlp_model=None, sckan_version=None):
         device = 'gpu' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
         log.info(f'loading {BERTModel}')
         self.__bert_model = SentenceTransformer(BERTModel, device=device) if bert_model is None else bert_model
@@ -74,7 +74,7 @@ class PMRIndexer:
         self.__nlp_model.add_pipe("abbreviation_detector")
         self.__pmr_workspace_dir = pmr_workspace_dir if pmr_workspace_dir is not None else WORKSPACE_DIR
         self.__sckan_version = sckan_version
-        self.__ontologies = pd.read_csv(pmr_onto, index_col=0)
+        self.__ontologies = load_ontologies()
 
     def __sckan_search(self, query, model, sckan_embs, k=10, th=0.7):
         query_emb = model.encode(query, show_progress_bar=False,  convert_to_tensor=True)
