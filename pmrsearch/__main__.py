@@ -43,6 +43,7 @@ def main():
     searcher = PMRSearcher()
     searcher.generate_and_save_sckan2pmr(min_sim=float(args.minimalSimilarity), exposure_only=args.exposureOnly)
 
+#===============================================================================
     
 if __name__ == '__main__':
     main()
