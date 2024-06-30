@@ -12,7 +12,7 @@ import git
 
 #===============================================================================
 ## load workspaces
-workspaces = loadJson(RS_WORKSPACE)['data']
+workspaces = loadJson(RS_WORKSPACE)
 
 ## functions for authors and description update
 valid_email_regex = '^(\w|\.|\_|\-)+[@](\w|\_|\-|\.)+[.]\w{2,3}$'
