@@ -1,4 +1,4 @@
-import logging
+import logging as log
 import git.exc
 from pmrsearch.setup import getJsonFromPmr, getAllFilesInDir, getUrlFromPmr, dumpPickle, loadJson, dumpJson as dJson
 from pmrsearch.setup import PMR_URL, CURRENT_PATH, WORKSPACE_DIR, RESOURCE_PATH
@@ -14,8 +14,8 @@ class PmrCollection:
         self.dataDict = loadJson(*paths)
         self.paths = paths
         if len(self.dataDict)==0:
-            self.dataDict['data'] = {}
-        self.data = self.dataDict['data']
+            self.dataDict = {}
+        self.data = self.dataDict
 
     def getJson(self):
         return self.dataDict
@@ -106,17 +106,17 @@ class Workspaces(WorkspaceCollection):
         repo_dirs = [os.path.join(os.path.join(WORKSPACE_DIR,name))
                      for name in os.listdir(WORKSPACE_DIR)
                      if os.path.isdir(os.path.join(WORKSPACE_DIR,name))]
-        print('Get local repo info')
+        log.info('Get local repo info')
         for repo_dir in tqdm(repo_dirs):
             self.__local_repo_info(repo_dir)
         self.dumpJson()
         # check current repo update
-        print('Check repo update')
+        log.info('Check repo update')
         for url in tqdm(set(listWorkspace) & set(self.data.keys())):
             self.__synchroWorkspace(url)
         self.dumpJson()
         # get or update workspaces
-        print('Download new repo')
+        log.info('Download new repo')
         for url in tqdm(set(listWorkspace) - set(self.data.keys())):
             self.__cloneWorkspace(url)
         self.dumpJson()
@@ -124,7 +124,7 @@ class Workspaces(WorkspaceCollection):
         for url in (set(self.data.keys()) - set(listWorkspace)):
             del self.data[url]
         # Synchronise with exposure
-        print('Synchronise with exposure')
+        log.info('Synchronise with exposure')
         self.__get_exposures()
         self.dumpJson()
         # Now update workspace level RDF
@@ -133,26 +133,31 @@ class Workspaces(WorkspaceCollection):
     def __local_repo_info(self, repo_dir, repo=None):
         repo = repo if repo is not None else git.Repo(repo_dir)
         url = repo.remotes.origin.url
-        if url not in self.data:
-            local_repo = {
-                'commit': repo.heads[0].commit.hexsha,
-                'workingDir': repo_dir.split('/')[-1],
-            }
-            collection = getJsonFromPmr(url)
-            if len(info:=collection.get('items', {})) > 0:
+        try:
+            if url not in self.data:
                 local_repo = {
-                    **local_repo,
-                    **{
-                        'id': info[0]['data'][0]['value'],
-                        'title': info[0]['data'][1]['value'],
-                        'owner': info[0]['data'][2]['value'],
-                        'description': info[0]['data'][3]['value'],
-                        'storage': info[0]['data'][4]['value'],
-                        'version': collection['version'],
-                        'subModels': [{'name': sm.name, 'workspace': sm.url, 'commit': sm.hexsha} for sm in repo.submodules]
-                    }
+                    'commit': repo.heads[0].commit.hexsha,
+                    'workingDir': repo_dir.split('/')[-1],
                 }
-            self.data[url] = local_repo
+                collection = getJsonFromPmr(url)
+                if len(info:=collection.get('items', {})) > 0:
+                    local_repo = {
+                        **local_repo,
+                        **{
+                            'id': info[0]['data'][0]['value'],
+                            'title': info[0]['data'][1]['value'],
+                            'owner': info[0]['data'][2]['value'],
+                            'description': info[0]['data'][3]['value'],
+                            'storage': info[0]['data'][4]['value'],
+                            'version': collection['version'],
+                            'subModels': [{'name': sm.name, 'workspace': sm.url, 'commit': sm.hexsha} for sm in repo.submodules],
+                            'hasExtracted': False
+                        }
+                    }
+                self.data[url] = local_repo
+        except:
+
+            log.warning(f'Workspace: {url} is unreachable')
 
     # synchronising workspace in local
     def __synchroWorkspace(self, url):
@@ -200,8 +205,7 @@ class Workspaces(WorkspaceCollection):
             exposure = getJsonFromPmr(url)
             for link in exposure['links']:
                 if link['prompt'] == 'Workspace URL':
-                    wks_url = link['href']
-                    if wks_url in self.data:
+                    if (wks_url:=link['href']) in self.data:
                         for d in exposure['items'][0]['data']:
                             if d['name'] == 'commit_id':
                                 if 'exposures' not in self.data[wks_url]:
@@ -209,7 +213,7 @@ class Workspaces(WorkspaceCollection):
                                 self.data[wks_url]['exposures'][url] = d['value']
                                 break
                     else:
-                        logging.error(f'Cannot find workspace {wks_url} for exposure {url} ')
+                        log.error(f'Cannot find workspace {wks_url} for exposure {url} ')
                     break
 
     def __updateRdf(self):
