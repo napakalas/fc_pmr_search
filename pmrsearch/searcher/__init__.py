@@ -15,6 +15,7 @@ import os
 import logging as log
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
+import copy
 
 from pmrsearch.indexer import RS_WORKSPACE
 
@@ -45,6 +46,7 @@ class PMRSearcher:
         self.__term_cellmls = data['termCellml']
         self.__cellml_ids = data['cellmlId']
         self.__cellml_embs = data['cellmlEmbs']
+        self.__workspaces = loadJson(RS_WORKSPACE)
 
         self.__model = SentenceTransformer(BIOBERT, device=device) if emb_model is None else emb_model
         self.__nlp = spacy.load(NLPModel) if nlp_model is None else nlp_model
@@ -84,6 +86,7 @@ class PMRSearcher:
     def __get_wks_exp(self, term):
         workspaces, exposures = [], []
         for cellml_id in (cellmls:=self.__term_cellmls[term]):
+            # print(cellml_id)
             cellml = self.__cellmls[cellml_id]
             if cellml['workspace'] not in workspaces:
                 workspaces += [cellml['workspace']]
@@ -221,39 +224,37 @@ class PMRSearcher:
             if len(pmr_models := self.search_cellml(sckan_id, min_sim=min_sim)) > 0:
                 found_models = []
                 for pmr_model in pmr_models:
-                    if pmr_model[1] not in found_models:
-                        cellml = self.__cellmls[pmr_model[1]]
-                        new_model = {
-                            'cellml': pmr_model[1],
-                            'workspace': cellml['workspace'],
-                            'score': pmr_model[0]
-                            }
-                        if exposure_only and 'exposure' in cellml:
-                            new_model['exposure'] = cellml['exposure']
-                            found_models += [new_model]
-                        elif not exposure_only:
-                            if 'exposure' in cellml:
-                                new_model['exposure'] = cellml['exposure']
+                    cellml = self.__cellmls[pmr_model[1]]
+                    new_model = {
+                        'cellml': pmr_model[1],
+                        'workspace': cellml['workspace'],
+                        'score': pmr_model[0]
+                        }
+                    for exposure in (exposures:=self.__workspaces[cellml['workspace']].get('exposures', [])):
+                        exp_new_model = copy.deepcopy(new_model)
+                        exp_new_model['exposure'] = exposure
+                        if exp_new_model not in found_models:
+                            found_models += [exp_new_model]
+                    if not exposure_only and len(exposures)==0:
+                        if new_model not in found_models:
                             found_models += [new_model]
                 if len(found_models) > 0:
                     term2pmr += [
                         {
                             "sckan_term": sckan_id,
+                            "label": ', '.join([self.__sckan_term[sckan_id]['label']] + self.__sckan_term[sckan_id]['synonym']),
                             "cellmls": found_models
                         }
                     ]
         return term2pmr
 
     def extract_exposure_data(self):
-        ## load workspaces
-        workspaces = loadJson(RS_WORKSPACE)
-
         ## functions for authors and description update
         valid_email_regex = '^(\w|\.|\_|\-)+[@](\w|\_|\-|\.)+[.]\w{2,3}$'
         bot_list = ['nobody@models.cellml.org', 'noreply']
 
         def update_authors_and_created_date(exposure):
-            if (workspace:=workspaces.get(exposure['workspace'])) is not None:
+            if (workspace:=self.__workspaces.get(exposure['workspace'])) is not None:
                 work_dir = f"{WORKSPACE_DIR}/{workspace['workingDir']}"
                 repo = git.Repo(work_dir)
                 commits = list(repo.iter_commits())
@@ -279,7 +280,7 @@ class PMRSearcher:
                         return
 
         def update_description(exposure):
-            if (workspace:=workspaces.get(exposure['workspace'])) is not None:
+            if (workspace:=self.__workspaces.get(exposure['workspace'])) is not None:
                 if workspace['description'] is not None:
                     if len(exposure['description']) == 0 and len(workspace['description']) > 0:
                         exposure['description'] = workspace['description']
@@ -312,6 +313,10 @@ class PMRSearcher:
             if 'workspace' not in exposure_info:
                 return [exposure_info]
             
+            # save documentation
+            text = [el.text.strip() for el in soup.find_all('div', {'id':'content-core'}) if len(el.text.strip()) > 0]
+            exposure_info['documentation'] = ' | '.join(text)
+            
             if len(omexes:=soup.find_all('a', href=re.compile('omex'))):
                 exposure_info['omex'] = omexes[0]['href']
             for image in soup.find_all('img'):
@@ -325,7 +330,7 @@ class PMRSearcher:
             # info from workspace
             exposure_info['authors'] = []
             exposure_info['description'] = ''
-            if exposure_info['workspace'] not in workspaces:
+            if exposure_info['workspace'] not in self.__workspaces:
                 exposure_info['authors'] = ', '.join(list(set(exposure_info['authors'])))
                 return [exposure_info]
             try:
