@@ -30,12 +30,12 @@ def main():
         workspaces.update()
 
         # updating SCKAN and create PMR index
-        if not args.cleanExtraction and args.sckanVersion is not None and args.sckanVersion != (c_version:=METADATA.get('sckan_version')):
+        if not args.cleanExtraction and args.sckanVersion is not None and args.sckanVersion != (c_version:=METADATA.get('sckan', {}).get('sckan_version')):
             log.error(f'SCKAN version of the current indexes is {c_version}, while this code run is {args.sckanVersion}. \
                       Rerun with --clean-extraction option')
             sys.exit()
         elif not args.cleanExtraction and args.sckanVersion is None:
-            args.sckanVersion = METADATA.get('sckan_version')
+            args.sckanVersion = METADATA.get('sckan', {}).get('sckan_version')
         pmr_indexer = PMRIndexer(pmr_workspace_dir=args.workspaceDir, sckan_version=args.sckanVersion)
         pmr_indexer.create_search_index(clean_extraction=args.cleanExtraction)
 

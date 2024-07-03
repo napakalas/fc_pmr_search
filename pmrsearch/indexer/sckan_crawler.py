@@ -117,15 +117,14 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
         return None, None, None
 
     store_as = SCKAN_GRAPH if store_as is None else store_as
-    if not clean_extraction and METADATA.get('sckan_version', '') == sckan_version:
+    if not clean_extraction and METADATA.get('sckan', {}).get('sckan_version', '') == sckan_version:
         try:
-            if (METADATA.get('sckan_version', '') == sckan_version or sckan_version is None):
-                with open(SCKAN_TERMS, 'r') as f:
-                    sckan_terms = json.load(f)
-                map_location = torch.device(device)
-                sckan_bert_embs = torch.load(SCKAN_BERT_FILE, map_location=map_location)
-                sckan_biobert_embs = torch.load(SCKAN_BIOBERT_FILE, map_location=map_location)
-                return sckan_terms, sckan_bert_embs, sckan_biobert_embs
+            with open(SCKAN_TERMS, 'r') as f:
+                sckan_terms = json.load(f)
+            map_location = torch.device(device)
+            sckan_bert_embs = torch.load(SCKAN_BERT_FILE, map_location=map_location)
+            sckan_biobert_embs = torch.load(SCKAN_BIOBERT_FILE, map_location=map_location)
+            return sckan_terms, sckan_bert_embs, sckan_biobert_embs
         except Exception:
             logging.warning('Cannot load the identified graph file. Continue to loading the provided URL')
             return
@@ -136,7 +135,7 @@ def extract_sckan_terms(ontologies, to_embedding, bert_model, biobert_model, nlp
     g = __load_sckan(sckan_url, store_as)
     # update METADATA sckan_url
     for k, v in npo_release.items():
-        METADATA[k] = v
+        METADATA['sckan'][k] = v
     # save metadata
     dumpJson(METADATA, METADATA_FILE)
     
