@@ -311,12 +311,12 @@ class PMRIndexer:
         
         # exploring cellml files for any documentation
         for cellml_url in tqdm(new_cellmls):
-            cellml_id = cellmls[cellml_url]
-            if len(cellml_ents:=[ent for doc in cellml_id.get('documentation',[]) for ent in doc_ents[doc]]) == 0:
-                if len(cellml_id.get('documentation',[])) > 0:
+            cellml_ids = cellmls[cellml_url]
+            if len(cellml_ents:=[ent for doc in cellml_ids.get('documentation',[]) for ent in doc_ents[doc]]) == 0:
+                if len(cellml_ids.get('documentation',[])) > 0:
                     # condition where there is documentation but no entity detected
-                    cellml_emb = torch.mean(torch.stack([doc_embeddings[all_documentation.index(doc)] for doc in cellml_id['documentation']]), dim=0)
-                elif len(rdf_leaves:=cellml_id.get('rdfLeaves', [])) > 0:
+                    cellml_emb = torch.mean(torch.stack([doc_embeddings[all_documentation.index(doc)] for doc in cellml_ids['documentation']]), dim=0)
+                elif len(rdf_leaves:=cellml_ids.get('rdfLeaves', [])) > 0:
                     # condition where there is no documentation
                     embs = [term_embeddings['embs'][term_embeddings['id'].index(url_to_curie(o))] for o in rdf_leaves if url_to_curie(o) in term_embeddings['id']]
                     if len(embs) > 0:
@@ -330,7 +330,7 @@ class PMRIndexer:
                 # condition where entity from documentation is available
                 cellml_emb = torch.mean(torch.stack([ent_embeddings[all_ents.index(cellml_ent)] for cellml_ent in cellml_ents]), dim=0)
             # check not_confirm term_id
-            for doc in cellml_id.get('documentation',[]):
+            for doc in cellml_ids.get('documentation',[]):
                 for term_id in set(doc_termids[doc]['not_confirm']):
                     if util.cos_sim(tmp_term_embeddings[term_id], cellml_emb) >= 0.9:
                         pmr_terms[term_id] = not_confirm_terms[term_id]
@@ -372,14 +372,14 @@ class PMRIndexer:
             for term_id, val in pmr_terms.items():
                 if term_id not in search_data['pmrTerm']:
                     search_data['pmrTerm'][term_id] = val
-            for term_id, cellml_id in term_to_cellml.items():
+            for term_id, cellml_ids in term_to_cellml.items():
                 if term_id not in search_data['termCellml']:
-                    search_data['termCellml'][term_id] = [cellml_id]
-                elif cellml_id not in search_data['termCellml'][term_id]:
-                    search_data['termCellml'][term_id] += [cellml_id]
-            for i, cellml_id in enumerate(cellml_embeddings['id']):
-                if cellml_id not in search_data['cellmlId']:
-                    search_data['cellmlId'] += [cellml_id]
+                    search_data['termCellml'][term_id] = cellml_ids
+                elif cellml_ids not in search_data['termCellml'][term_id]:
+                    search_data['termCellml'][term_id] += cellml_ids
+            for i, cellml_ids in enumerate(cellml_embeddings['id']):
+                if cellml_ids not in search_data['cellmlId']:
+                    search_data['cellmlId'] += [cellml_ids]
                     search_data['cellmlEmbs'] = torch.cat((search_data['cellmlEmbs'], torch.stack([cellml_embeddings['embs'][i]])), 0)
 
             return {'id':search_data['term'], 'embs':search_data['embedding']}, search_data['pmrTerm'], cellmls, search_data['termCellml'], {'id':search_data['cellmlId'], 'embs':search_data['cellmlEmbs']}
