@@ -5,29 +5,53 @@
     "description": "An object specifying files and SCKAN used in a particular version.",
     "type": "object",
     "properties": {
-        "sckan_url": {
-            "description": "URL of SCKAN to download sources",
-            "type": "string"
-        },
         "pmrindexer_version": {
-            "description": "The version of pmrindexer to generate SCKAN2PMR",
+            "description": "The version of pmrindexer to generate SCKAN2PMR.",
             "type": "string"
         },
         "minimum_similarity": {
-            "description": "Minimum similarity between SCKAN ontology term and cellml files",
+            "description": "Minimum similarity between SCKAN ontology term and cellml files.",
             "type": "number"
         },
-        "sckan_sha": {
-            "description": "SHA of SCKAN version",
-            "type": "string"
+        "sckan": {
+            "description": "All about SCKAN version used.",
+            "type": "object",
+            "properties": {
+                "sckan_url": {
+                    "description": "URL of SCKAN to download sources.",
+                    "type": "string"
+                },
+                "sckan_sha": {
+                    "description": "SHA of SCKAN version.",
+                    "type": "string"
+                },
+                "sckan_version": {
+                    "description": "SCKAN version with format sckan-xxxx-xx-xx.",
+                    "type": "string"
+                },
+                "sckan_path": {
+                    "description": "Path of SCKAN repo related to the SCKAN version.",
+                    "type": "string"
+                },
+                "sckan_build": {
+                    "description": "Build date of SCKAN release.",
+                    "type": "string"
+                }
+            }
         },
-        "sckan_version": {
-            "description": "SCKAN version with format sckan-xxxx-xx-xx",
-            "type": "string"
-        },
-        "sckan_path": {
-            "description": "Path of SCKAN repo related to the SCKAN version",
-            "type": "string"
+        "ontology": {
+            "description": "Ontology used to extract textual information from PMR's model.",
+            "type": "object",
+            "properties": {
+                "source": {
+                    "description": "URL to get the ontologies.",
+                    "type": "string"
+                },
+                "type":{
+                    "description": "The ontology name and version.",
+                    "type": "object"
+                }
+            }
         },
         "files": {
             "description": "List of files in a release",
@@ -37,5 +61,5 @@
             }
         }
     },
-    "required": ["pmrindexer_version", "minimum_similarity", "sckan_sha", "sckan_version", "sckan_path", "files"]
+    "required": ["pmrindexer_version", "minimum_similarity", "sckan", "ontology", "files"]
 }

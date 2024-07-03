@@ -6,27 +6,31 @@
     "type": "array",
     "properties": {
         "sckan_term": {
-            "description": "Ontology terms used in SCKAN",
+            "description": "The id of an ontology term used in SCKAN.",
+            "type": "string"
+        },
+        "label": {
+            "description": "The label and synonym combined of the ontology id.",
             "type": "string"
         },
         "cellmls": {
-            "description": "List of cellml files related to an ontology term",
+            "description": "List of cellml files related to an ontology term.",
             "type": "array",
             "properties":{
                 "cellml": {
-                    "description": "URL of the cellml file for the model in the Physiome Project",
+                    "description": "URL of the cellml file for the model in the Physiome Project.",
                     "type": "string"
                 },
                 "workspace": {
-                    "description": "URL of the workspace for the model in the Physiome Project",
+                    "description": "URL of the workspace for the model in the Physiome Project.",
                     "type": "string"
                 },
                 "score": {
-                    "description": "Similarity score between ontology term and cellml file",
+                    "description": "Similarity score between ontology term and cellml file.",
                     "type": "number"
                 },
                 "exposure": {
-                    "description": "URL of the exposure for the model in the Physiome Project",
+                    "description": "URL of the exposure for the model in the Physiome Project.",
                     "type": "string"
                 }
             },
