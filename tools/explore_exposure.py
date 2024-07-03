@@ -78,6 +78,10 @@ def extract_exposure(exposure_url):
     if 'workspace' not in exposure_info:
         return [exposure_info]
     
+    # save documentation
+    text = [el.text.strip() for el in soup.find_all('div', {'id':'content-core'}) if len(el.text.strip()) > 0]
+    exposure_info['documentation'] = ' | '.join(text)
+
     if len(omexes:=soup.find_all('a', href=re.compile('omex'))):
         exposure_info['omex'] = omexes[0]['href']
     for image in soup.find_all('img'):
@@ -125,7 +129,7 @@ for exposure_url in tqdm(exposure_urls:=getUrlFromPmr(PMR_URL + 'exposure')):
     else:
         exposure_infos += extract_exposure(exposure_url)
 
-with open('/Users/ymun794/Documents/MapCore/fc-pmr-search/pmrsearch/output/exposures2.json', 'w') as f:
+with open('/Users/ymun794/Documents/MapCore/fc-pmr-search/pmrsearch/output/exposures.json', 'w') as f:
     json.dump(exposure_infos, f, indent=4)
 
         
