@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pmrsearch"
-version = "0.0.4"
+version = "0.0.5"
 description = "Find all models in the PMR based on model terms in FC and SCKAN"
 authors = ["Yuda Munarko <yuda.munarko@auckland.ac.nz>"]
 include = [
